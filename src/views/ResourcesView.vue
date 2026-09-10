@@ -251,7 +251,7 @@
             <template v-else>
               <UploadCloud class="size-7 text-ink-400" />
               <p class="mt-2.5 text-[13.5px] font-medium text-ink-700">点击选择文件，或拖拽到此处</p>
-              <p class="mt-0.5 text-[12px] text-ink-400">单个文件不超过 100MB</p>
+              <p class="mt-0.5 text-[12px] text-ink-400">单个文件不超过 {{ MAX_UPLOAD_LABEL }}</p>
             </template>
             <input ref="fileInput" type="file" class="hidden" @change="handleFile" />
           </div>
@@ -388,7 +388,7 @@ import {
   topResources,
 } from '@/api/resources'
 import { listCourseOptions } from '@/api/courses'
-import { FILE_KIND_OPTIONS } from '@/lib/dict'
+import { FILE_KIND_OPTIONS, MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from '@/lib/dict'
 import { formatDate, formatFileSize } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -550,8 +550,8 @@ function handleDrop(event) {
 }
 
 function pickFile(file) {
-  if (file.size > 100 * 1024 * 1024) {
-    formError.value = '单个文件不能超过 100MB'
+  if (file.size > MAX_UPLOAD_BYTES) {
+    formError.value = `单个文件不能超过 ${MAX_UPLOAD_LABEL}`
     return
   }
   formError.value = ''

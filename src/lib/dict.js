@@ -1,5 +1,14 @@
 /** 业务字典：状态文案与配色（配合 Tailwind 类名使用） */
 
+/**
+ * 单个资源文件的上传上限。
+ * 受 Supabase 套餐限制：免费版 storage.max_file_size = 50MB 且不可调整
+ * （提升需升级付费计划）。这里作为前端唯一口径，同时 storage.buckets
+ * 的 file_size_limit 与 supabase/03_policies.sql 也保持一致。
+ */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+export const MAX_UPLOAD_LABEL = '50MB'
+
 export const COURSE_STATUS = {
   draft: { label: '草稿', style: 'bg-ink-100 text-ink-600 border-ink-200', dot: 'bg-ink-400' },
   published: { label: '已上架', style: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },

@@ -94,11 +94,30 @@ site_settings（键值型站点配置）
 
 ### 存储桶
 
-| 桶 | 可见性 | 用途 |
+| 桶 | 可见性 | 单个文件上限 | 用途 |
+| --- | --- | --- | --- |
+| `covers` | 公开读 | 5 MB | 课程封面，需课程编辑权限才能写入 |
+| `avatars` | 公开读 | 2 MB | 用户头像，仅能写入 `{用户ID}/` 目录 |
+| `resources` | 私有 | 50 MB | 教学资源，下载走 5 分钟有效的签名链接 |
+
+### 上传容量说明（重要）
+
+容量限制来自三层，任何一层不满足都会被拒：
+
+| 层级 | 限制 | 是否可调 |
 | --- | --- | --- |
-| `covers` | 公开读 | 课程封面，需课程编辑权限才能写入 |
-| `avatars` | 公开读 | 用户头像，仅能写入 `{用户ID}/` 目录 |
-| `resources` | 私有 | 教学资源，下载走 5 分钟有效的签名链接 |
+| 单个文件（Supabase 免费版） | **50 MB** | ❌ 需升级付费计划（`storage.max_file_size.configurable = false`） |
+| 存储总容量（Supabase 免费版） | **1 GB** | ❌ 需升级付费计划 |
+| 单桶限制（本项目配置） | 见上表 | ✅ 改 `storage.buckets.file_size_limit` |
+
+前端的上限口径统一定义在 `src/lib/dict.js` 的 `MAX_UPLOAD_BYTES`，改限制时
+**必须同时更新**：该常量、`storage.buckets.file_size_limit`、
+以及 `supabase/03_policies.sql` 里建桶语句的值，否则会出现
+「前端放行、存储层报错」的不一致。
+
+> 1 GB 是 Supabase 官方对免费版 File Storage 的额度，实际用量以
+> Supabase 后台 → Settings → Usage 的实时读数为准。
+> 若资源量大，建议把视频类素材放到对象存储/CDN，`resources` 桶只放文档与图片。
 
 ---
 

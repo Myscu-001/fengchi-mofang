@@ -208,11 +208,14 @@ create policy site_settings_manage on public.site_settings
 -- =============================================================================
 -- 存储桶
 -- =============================================================================
+-- 注意：resources 桶的 50MB 与 Supabase 免费版 storage.max_file_size 一致。
+-- 该项目级上限在免费版不可调整，桶级限制设得更高也没有意义，只会造成
+-- 「前端放行、存储层报错」的不一致。升级付费计划后可同步放宽这两处。
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
   ('covers',    'covers',    true,  5242880,  array['image/png','image/jpeg','image/webp','image/gif','image/svg+xml']),
   ('avatars',   'avatars',   true,  2097152,  array['image/png','image/jpeg','image/webp']),
-  ('resources', 'resources', false, 104857600, null)
+  ('resources', 'resources', false, 52428800, null)
 on conflict (id) do update
   set public          = excluded.public,
       file_size_limit = excluded.file_size_limit;
