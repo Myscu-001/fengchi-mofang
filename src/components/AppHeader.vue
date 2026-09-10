@@ -2,7 +2,7 @@
   <header class="sticky top-0 z-50 border-b border-ink-200 bg-white/85 backdrop-blur-md">
     <div class="fc-container flex h-15 items-center gap-4">
       <RouterLink :to="{ name: 'home' }" class="shrink-0">
-        <LogoMark />
+        <LogoMark :brand="site.brand" />
       </RouterLink>
 
       <!-- 桌面导航 -->
@@ -153,6 +153,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  Award,
   Boxes,
   ChevronDown,
   FolderOpen,
@@ -172,11 +173,13 @@ import LogoMark from '@/components/LogoMark.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
 import UiBadge from '@/components/UiBadge.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSiteStore } from '@/stores/site'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
 import { roleLabel, roleStyle } from '@/lib/permissions'
 
 const auth = useAuthStore()
+const site = useSiteStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
 const router = useRouter()
@@ -200,6 +203,7 @@ const navDefs = [
 const adminDefs = [
   { to: { name: 'admin-users' }, label: '账号管理', icon: UserCog, perm: 'user.manage' },
   { to: { name: 'admin-roles' }, label: '角色权限', icon: ShieldCheck, perm: 'role.manage' },
+  { to: { name: 'admin-coaches' }, label: '师资团队', icon: Award, perm: 'coach.manage' },
   { to: { name: 'admin-settings' }, label: '站点配置', icon: Settings, perm: 'settings.manage' },
 ]
 
@@ -215,7 +219,10 @@ function handleOutsideClick(event) {
   if (adminRef.value && !adminRef.value.contains(event.target)) adminOpen.value = false
 }
 
-onMounted(() => document.addEventListener('click', handleOutsideClick))
+onMounted(() => {
+  document.addEventListener('click', handleOutsideClick)
+  site.load()
+})
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick))
 
 async function handleSignOut() {

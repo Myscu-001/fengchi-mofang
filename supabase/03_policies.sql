@@ -23,6 +23,7 @@ alter table public.grades              enable row level security;
 alter table public.resource_categories enable row level security;
 alter table public.resources           enable row level security;
 alter table public.resource_downloads  enable row level security;
+alter table public.coaches             enable row level security;
 alter table public.site_settings       enable row level security;
 
 -- -----------------------------------------------------------------------------
@@ -191,6 +192,20 @@ drop policy if exists res_downloads_select on public.resource_downloads;
 create policy res_downloads_select on public.resource_downloads
   for select to authenticated using (public.has_perm('resource.view'));
 -- 写入仅通过 public.register_download() 这个 security definer 函数完成
+
+-- -----------------------------------------------------------------------------
+-- 师资团队（对外展示信息，未登录也可读；仅机构人员能看到停用中的教练）
+-- -----------------------------------------------------------------------------
+drop policy if exists coaches_select on public.coaches;
+create policy coaches_select on public.coaches
+  for select to anon, authenticated
+  using (is_active = true or public.is_active_staff());
+
+drop policy if exists coaches_manage on public.coaches;
+create policy coaches_manage on public.coaches
+  for all to authenticated
+  using (public.has_perm('coach.manage'))
+  with check (public.has_perm('coach.manage'));
 
 -- -----------------------------------------------------------------------------
 -- 站点配置（首页文案对外可读，便于未登录时展示品牌信息）

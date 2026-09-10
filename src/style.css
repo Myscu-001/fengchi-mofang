@@ -1,52 +1,59 @@
 @import 'tailwindcss';
 
 /* ============================================================
-   风驰思维魔方 · 设计令牌
-   品牌主色取自魔方蓝，辅以魔方六面标准色作为语义色
+   风驰思维 · 设计令牌
+   品牌主色取自机构 LOGO 中「F」面的珊瑚红（#EA625F），
+   辅以立方体另外三面的黄、绿、蓝作为语义色，
+   整体构成与 LOGO 一致的色彩体系。
    ============================================================ */
 @theme {
   --font-sans:
     'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC', system-ui,
     -apple-system, 'Segoe UI', sans-serif;
 
-  /* 品牌蓝 */
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dbe7ff;
-  --color-brand-200: #bdd2ff;
-  --color-brand-300: #93b4ff;
-  --color-brand-400: #628cff;
-  --color-brand-500: #3366ff;
-  --color-brand-600: #1f47f5;
-  --color-brand-700: #1836dd;
-  --color-brand-800: #1a2fb0;
-  --color-brand-900: #1c2f8b;
-  --color-brand-950: #151d54;
+  /* 品牌色：珊瑚红（LOGO 主色，逐级加深以保证文字对比度） */
+  --color-brand-50: #fff4f3;
+  --color-brand-100: #ffe5e3;
+  --color-brand-200: #ffcbc8;
+  --color-brand-300: #fca9a4;
+  --color-brand-400: #f5827c;
+  --color-brand-500: #e8564f;
+  --color-brand-600: #d13b34;
+  --color-brand-700: #ae2c27;
+  --color-brand-800: #8b2521;
+  --color-brand-900: #712220;
+  --color-brand-950: #3d0f0e;
 
-  /* 魔方六色 */
-  --color-cube-red: #ef4444;
-  --color-cube-orange: #f97316;
-  --color-cube-yellow: #facc15;
-  --color-cube-green: #22c55e;
-  --color-cube-blue: #3b82f6;
-  --color-cube-white: #f8fafc;
+  /* 立方体四色：取自 LOGO（用于点缀、分类标识、插图）
+     -base 用于色块与圆点；-deep 用于白底上的文字，保证可读性 */
+  --color-cube-red: #ea625f;
+  --color-cube-yellow: #f2e926;
+  --color-cube-green: #93bc37;
+  --color-cube-blue: #34b4e2;
+  --color-cube-orange: #f0a020;
+
+  --color-cube-red-deep: #c43b36;
+  --color-cube-yellow-deep: #a88600;
+  --color-cube-green-deep: #5f821f;
+  --color-cube-blue-deep: #1a7fa8;
 
   /* 中性色（浅色主题） */
-  --color-ink-50: #f7f9fc;
-  --color-ink-100: #eef2f7;
-  --color-ink-200: #e2e8f0;
-  --color-ink-300: #cbd5e1;
-  --color-ink-400: #94a3b8;
-  --color-ink-500: #64748b;
-  --color-ink-600: #475569;
-  --color-ink-700: #334155;
-  --color-ink-800: #1e293b;
-  --color-ink-900: #0f172a;
+  --color-ink-50: #f8f8f7;
+  --color-ink-100: #f0f1ef;
+  --color-ink-200: #e3e5e2;
+  --color-ink-300: #cbcfc9;
+  --color-ink-400: #a0a69c;
+  --color-ink-500: #6f766c;
+  --color-ink-600: #545a51;
+  --color-ink-700: #3d423a;
+  --color-ink-800: #262a24;
+  --color-ink-900: #14170f;
 
   --radius-card: 16px;
   --radius-field: 10px;
 
-  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -6px rgb(15 23 42 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 40px -12px rgb(15 23 42 / 0.16);
+  --shadow-soft: 0 1px 2px rgb(20 23 15 / 0.04), 0 8px 24px -6px rgb(20 23 15 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(20 23 15 / 0.05), 0 18px 40px -12px rgb(20 23 15 / 0.16);
 }
 
 @layer base {
@@ -134,7 +141,7 @@
   }
   .fc-input:focus {
     border-color: var(--color-brand-500);
-    box-shadow: 0 0 0 3px rgb(51 102 255 / 0.14);
+    box-shadow: 0 0 0 3px rgb(232 86 79 / 0.16);
   }
   .fc-input:disabled {
     background: var(--color-ink-100);
@@ -153,13 +160,13 @@
     min-height: 96px;
   }
 
-  /* 魔方渐变背景 */
+  /* 立方体四色渐变背景（与 LOGO 配色一致） */
   .fc-cube-bg {
     background-image:
-      radial-gradient(circle at 12% 18%, rgb(239 68 68 / 0.1), transparent 42%),
-      radial-gradient(circle at 88% 12%, rgb(250 204 21 / 0.14), transparent 40%),
-      radial-gradient(circle at 78% 88%, rgb(34 197 94 / 0.12), transparent 42%),
-      radial-gradient(circle at 18% 86%, rgb(51 102 255 / 0.14), transparent 44%);
+      radial-gradient(circle at 12% 18%, rgb(234 98 95 / 0.12), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgb(242 233 38 / 0.16), transparent 40%),
+      radial-gradient(circle at 78% 88%, rgb(147 188 55 / 0.13), transparent 42%),
+      radial-gradient(circle at 18% 86%, rgb(52 180 226 / 0.14), transparent 44%);
   }
 }
 

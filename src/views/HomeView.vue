@@ -2,22 +2,30 @@
   <div>
     <!-- ============ 首屏 ============ -->
     <section class="fc-cube-bg border-b border-ink-200 bg-white">
-      <div class="fc-container py-14 lg:py-20">
-        <div class="grid items-center gap-10 lg:grid-cols-[1.15fr_1fr]">
+      <div class="fc-container py-12 lg:py-16">
+        <div class="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div class="fc-anim-in">
             <span
               class="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[12px] font-medium text-brand-700"
             >
               <Sparkles class="size-3.5" />
-              机构内部教学管理系统
+              魔方 + 博弈桌游 双课程线
             </span>
 
-            <h1 class="mt-5 text-[34px] leading-[1.15] font-bold tracking-tight text-ink-900 lg:text-[46px]">
-              {{ hero.title || '风驰思维魔方' }}
+            <h1 class="mt-5 text-[34px] leading-[1.15] font-bold tracking-tight text-ink-900 lg:text-[44px]">
+              {{ hero.title || brand.name }}
             </h1>
             <p class="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-600">
-              {{ hero.subtitle || '以魔方为载体，训练观察力、记忆力、空间想象力与专注力。' }}
+              {{ hero.subtitle || brand.slogan }}
             </p>
+
+            <!-- 四条能力主张 -->
+            <div class="mt-5 flex flex-wrap gap-x-4 gap-y-1.5">
+              <span v-for="tag in capabilityTags" :key="tag" class="inline-flex items-center gap-1.5 text-[12.5px] text-ink-500">
+                <span class="size-1.5 rounded-full" :style="{ backgroundColor: tag.color }" />
+                {{ tag.text }}
+              </span>
+            </div>
 
             <div class="mt-7 flex flex-wrap items-center gap-3">
               <template v-if="auth.isLoggedIn">
@@ -26,7 +34,7 @@
                   class="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-600 px-5 text-sm font-medium text-white shadow-soft transition hover:bg-brand-700"
                 >
                   <Boxes class="size-4" />
-                  开始管理课程
+                  进入课程体系
                 </RouterLink>
                 <RouterLink
                   :to="{ name: 'resources' }"
@@ -48,7 +56,7 @@
                 <button
                   type="button"
                   class="inline-flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-white px-5 text-sm font-medium text-ink-700 transition hover:bg-ink-50"
-                  @click="scrollTo('highlights')"
+                  @click="scrollTo('curriculum')"
                 >
                   {{ hero.secondary_cta || '了解课程体系' }}
                   <ArrowDown class="size-4" />
@@ -65,24 +73,15 @@
             </div>
           </div>
 
-          <!-- 魔方视觉 -->
-          <div class="fc-anim-in hidden justify-center lg:flex">
+          <!-- 品牌标准字 -->
+          <div class="fc-anim-in flex justify-center">
             <div class="relative">
-              <div class="absolute -inset-6 rounded-[36px] bg-brand-100/50 blur-2xl" />
-              <svg viewBox="0 0 240 240" class="relative w-[280px] drop-shadow-xl">
-                <g v-for="(row, r) in cubeGrid" :key="r">
-                  <rect
-                    v-for="(color, c) in row"
-                    :key="`${r}-${c}`"
-                    :x="30 + c * 62"
-                    :y="30 + r * 62"
-                    width="54"
-                    height="54"
-                    rx="10"
-                    :fill="color"
-                  />
-                </g>
-              </svg>
+              <div class="absolute -inset-8 rounded-[40px] bg-brand-100/40 blur-3xl" />
+              <img
+                :src="assetUrl(brand.logo_url)"
+                class="relative w-[300px] max-w-full drop-shadow-xl lg:w-[360px]"
+                :alt="brand.full_name"
+              />
             </div>
           </div>
         </div>
@@ -94,7 +93,7 @@
       <div class="mb-5 flex items-end justify-between gap-4">
         <div>
           <h2 class="text-[19px] font-semibold text-ink-900">教学概览</h2>
-          <p class="mt-1 text-[13px] text-ink-500">实时统计你在机构内的教学数据</p>
+          <p class="mt-1 text-[13px] text-ink-500">实时统计机构内的教学数据</p>
         </div>
         <button
           type="button"
@@ -114,7 +113,6 @@
       </div>
 
       <div class="mt-5 grid gap-4 lg:grid-cols-3">
-        <!-- 最近课程 -->
         <div class="fc-card p-4.5">
           <div class="flex items-center justify-between">
             <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
@@ -124,9 +122,7 @@
           </div>
           <ul v-if="recentCourseList.length" class="mt-3 divide-y divide-ink-100">
             <li v-for="c in recentCourseList" :key="c.id" class="flex items-center gap-3 py-2.5">
-              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50">
-                <Boxes class="size-4 text-brand-500" />
-              </div>
+              <TrackDot :track="c.track" />
               <div class="min-w-0 flex-1">
                 <RouterLink
                   :to="{ name: 'course-detail', params: { id: c.id } }"
@@ -142,11 +138,10 @@
           <p v-else class="py-6 text-center text-[13px] text-ink-400">暂无课程</p>
         </div>
 
-        <!-- 最近资源 -->
         <div class="fc-card p-4.5">
           <div class="flex items-center justify-between">
             <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
-              <FolderOpen class="size-4 text-violet-500" />最近资源
+              <FolderOpen class="size-4 text-cube-green-deep" />最近资源
             </h3>
             <RouterLink :to="{ name: 'resources' }" class="text-xs text-brand-600 hover:underline">全部</RouterLink>
           </div>
@@ -164,11 +159,10 @@
           <p v-else class="py-6 text-center text-[13px] text-ink-400">暂无资源</p>
         </div>
 
-        <!-- 最近成绩 -->
         <div class="fc-card p-4.5">
           <div class="flex items-center justify-between">
             <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
-              <Trophy class="size-4 text-amber-500" />最近成绩
+              <Trophy class="size-4 text-cube-yellow-deep" />最近成绩
             </h3>
             <RouterLink :to="{ name: 'grades' }" class="text-xs text-brand-600 hover:underline">全部</RouterLink>
           </div>
@@ -180,9 +174,7 @@
                 <p class="line-clamp-1 text-[11.5px] text-ink-400">{{ g.assessment_title }}</p>
               </div>
               <div class="text-right">
-                <p class="text-[13px] font-semibold text-brand-700 tabular-nums">
-                  {{ g.score ?? '—' }}
-                </p>
+                <p class="text-[13px] font-semibold text-brand-700 tabular-nums">{{ g.score ?? '—' }}</p>
                 <p v-if="g.duration_ms" class="text-[11px] text-ink-400 tabular-nums">
                   {{ formatDuration(g.duration_ms) }}
                 </p>
@@ -194,27 +186,171 @@
       </div>
     </section>
 
-    <!-- ============ 特色 ============ -->
-    <section id="highlights" class="border-y border-ink-200 bg-white py-14">
+    <!-- ============ 课程体系（双课程线） ============ -->
+    <section v-if="curriculum.tracks?.length" id="curriculum" class="border-y border-ink-200 bg-white py-14">
       <div class="fc-container">
         <div class="mx-auto max-w-2xl text-center">
-          <h2 class="text-[24px] font-bold tracking-tight text-ink-900">我们怎么教</h2>
+          <h2 class="text-[24px] font-bold tracking-tight text-ink-900">
+            {{ curriculum.title || '课程体系' }}
+          </h2>
+          <p class="mt-2.5 text-[14px] text-ink-500">{{ curriculum.subtitle }}</p>
+        </div>
+
+        <div class="mt-9 grid gap-5 lg:grid-cols-2">
+          <div
+            v-for="track in curriculum.tracks"
+            :key="track.name"
+            class="fc-card overflow-hidden transition hover:shadow-lift"
+          >
+            <div class="h-1.5" :style="{ backgroundColor: track.color }" />
+            <div class="p-5 lg:p-6">
+              <div class="flex items-baseline justify-between gap-3">
+                <h3 class="text-[18px] font-bold tracking-tight text-ink-900">{{ track.name }}</h3>
+                <span class="text-[11px] font-medium tracking-widest text-ink-300 uppercase">{{ track.label }}</span>
+              </div>
+              <p class="mt-2 text-[13px] leading-relaxed text-ink-500">{{ track.note }}</p>
+
+              <ol class="mt-5 space-y-0">
+                <li
+                  v-for="(stage, i) in track.stages"
+                  :key="stage.title"
+                  class="relative flex gap-3.5 pb-5 last:pb-0"
+                >
+                  <!-- 连接线 -->
+                  <span
+                    v-if="i < track.stages.length - 1"
+                    class="absolute top-7 left-[13px] h-full w-px"
+                    :style="{ backgroundColor: `${track.color}33` }"
+                  />
+                  <span
+                    class="z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                    :style="{ backgroundColor: track.color }"
+                  >
+                    {{ i + 1 }}
+                  </span>
+                  <div class="min-w-0 pt-0.5">
+                    <p class="text-[14px] font-medium text-ink-800">{{ stage.title }}</p>
+                    <p class="mt-0.5 text-[12.5px] leading-relaxed text-ink-500">{{ stage.desc }}</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <RouterLink
+            v-if="auth.isLoggedIn"
+            :to="{ name: 'courses' }"
+            class="inline-flex h-10.5 items-center gap-2 rounded-xl bg-brand-600 px-5 text-sm font-medium text-white shadow-soft transition hover:bg-brand-700"
+          >
+            <Boxes class="size-4" />
+            查看全部课程
+          </RouterLink>
+          <span v-else class="text-[13px] text-ink-500">
+            完整课程信息与教案在系统内查看，教师账号由机构管理员开通
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 课程技能 / 学习收获 ============ -->
+    <section v-if="outcomes.cube || outcomes.board" class="fc-container py-14">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-[24px] font-bold tracking-tight text-ink-900">{{ outcomes.title || '课程技能' }}</h2>
+        <p class="mt-2.5 text-[14px] text-ink-500">{{ outcomes.subtitle }}</p>
+      </div>
+
+      <div class="mt-9 grid gap-5 lg:grid-cols-2">
+        <div v-for="block in outcomeBlocks" :key="block.title" class="fc-card p-5 lg:p-6">
+          <h3 class="flex items-center gap-2 text-[16px] font-semibold text-ink-900">
+            <span class="size-2.5 rounded-sm" :style="{ backgroundColor: block.color }" />
+            {{ block.title }}
+          </h3>
+          <ul class="mt-4 grid gap-2.5 sm:grid-cols-2">
+            <li v-for="item in block.items" :key="item" class="flex items-start gap-2">
+              <Check class="mt-0.5 size-3.5 shrink-0" :style="{ color: block.color }" />
+              <span class="text-[13px] leading-relaxed text-ink-600">{{ item }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 师资团队 ============ -->
+    <section v-if="coaches.length" class="border-y border-ink-200 bg-white py-14">
+      <div class="fc-container">
+        <div class="mx-auto max-w-2xl text-center">
+          <h2 class="text-[24px] font-bold tracking-tight text-ink-900">师资团队</h2>
           <p class="mt-2.5 text-[14px] text-ink-500">
-            魔方不只是玩具，它是可以被系统化训练的思维体操。
+            教练团队具备魔方职业选手竞技水平，拥有多年教学经验与赛事实战经历
           </p>
         </div>
 
-        <div class="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="(item, i) in highlights"
-            :key="i"
-            class="fc-card p-5 transition hover:-translate-y-0.5 hover:shadow-lift"
+            v-for="coach in coaches"
+            :key="coach.id"
+            class="fc-card flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lift"
           >
+            <div class="flex items-center gap-3">
+              <UiAvatar :src="coach.avatar_url" :name="coach.name" size="lg" />
+              <div class="min-w-0">
+                <p class="text-[15px] font-semibold text-ink-900">{{ coach.name }}</p>
+                <p class="mt-0.5 text-[12px] text-ink-500">{{ coach.title || '教练' }}</p>
+              </div>
+            </div>
+
+            <div v-if="coachMetrics(coach).length" class="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-ink-100 pt-3.5">
+              <div v-for="m in coachMetrics(coach)" :key="m.label">
+                <p class="text-[11px] text-ink-400">{{ m.label }}</p>
+                <p class="text-[13.5px] font-semibold text-brand-700 tabular-nums">{{ m.value }}</p>
+              </div>
+            </div>
+
+            <ul v-if="coach.highlights?.length" class="mt-3.5 space-y-1.5">
+              <li v-for="h in coach.highlights" :key="h" class="flex items-start gap-1.5">
+                <span class="mt-1.5 size-1 shrink-0 rounded-full bg-cube-yellow-deep" />
+                <span class="text-[12.5px] leading-relaxed text-ink-600">{{ h }}</span>
+              </li>
+            </ul>
+
+            <p v-if="coach.bio" class="mt-3.5 text-[12.5px] leading-relaxed text-ink-500">{{ coach.bio }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 教学理念 ============ -->
+    <section v-if="philosophy.content" class="fc-container py-14">
+      <div class="relative overflow-hidden rounded-2xl bg-ink-900 px-6 py-10 lg:px-14 lg:py-12">
+        <div class="fc-cube-bg absolute inset-0 opacity-40" />
+        <div class="relative mx-auto max-w-3xl text-center">
+          <Quote class="mx-auto size-7 text-cube-yellow" />
+          <p class="mt-5 text-[19px] leading-[1.75] font-medium text-white lg:text-[22px]">
+            {{ philosophy.content }}
+          </p>
+          <p class="mt-5 text-[12.5px] tracking-widest text-white/50 uppercase">
+            {{ philosophy.title || '我们的判断' }}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 为什么选择我们 ============ -->
+    <section v-if="why.items?.length" class="border-y border-ink-200 bg-white py-14">
+      <div class="fc-container">
+        <div class="mx-auto max-w-2xl text-center">
+          <h2 class="text-[24px] font-bold tracking-tight text-ink-900">{{ why.title || '为什么选择我们' }}</h2>
+        </div>
+
+        <div class="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div v-for="(item, i) in why.items" :key="item.title" class="fc-card p-5">
             <span
-              class="inline-flex size-9.5 items-center justify-center rounded-xl text-white"
-              :style="{ backgroundColor: item.color || '#3366ff' }"
+              class="inline-flex size-9 items-center justify-center rounded-xl text-[13px] font-semibold text-white"
+              :style="{ backgroundColor: cubeColors[i % cubeColors.length] }"
             >
-              <component :is="highlightIcons[i % highlightIcons.length]" class="size-4.5" />
+              {{ String(i + 1).padStart(2, '0') }}
             </span>
             <h3 class="mt-3.5 text-[15px] font-semibold text-ink-900">{{ item.title }}</h3>
             <p class="mt-1.5 text-[13px] leading-relaxed text-ink-500">{{ item.desc }}</p>
@@ -223,46 +359,48 @@
       </div>
     </section>
 
-    <!-- ============ 课程体系（未登录时的对外展示） ============ -->
-    <section v-if="!auth.isLoggedIn && publicCourses.length" class="fc-container py-14">
-      <div class="mb-7 text-center">
-        <h2 class="text-[24px] font-bold tracking-tight text-ink-900">课程体系</h2>
-        <p class="mt-2.5 text-[14px] text-ink-500">从启蒙到竞速，四阶递进的成长路径</p>
-      </div>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div v-for="c in publicCourses" :key="c.id" class="fc-card p-5">
-          <UiBadge :label="c.category || '课程'" custom-class="bg-brand-50 text-brand-700 border-brand-200" />
-          <h3 class="mt-3 text-[15px] font-semibold text-ink-900">{{ c.title }}</h3>
-          <p class="mt-1.5 line-clamp-3 text-[13px] leading-relaxed text-ink-500">{{ c.summary }}</p>
-          <div class="mt-3.5 flex items-center gap-3 border-t border-ink-100 pt-3 text-[11.5px] text-ink-500">
-            <span v-if="c.age_range">{{ c.age_range }}</span>
-            <span>{{ c.total_lessons }} 课时</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 机构介绍 ============ -->
+    <!-- ============ 关于我们 ============ -->
     <section class="fc-container py-14">
       <div class="fc-card overflow-hidden">
-        <div class="grid lg:grid-cols-[1.3fr_1fr]">
+        <div class="grid lg:grid-cols-[1.35fr_1fr]">
           <div class="p-6 lg:p-8">
             <h2 class="text-[20px] font-bold tracking-tight text-ink-900">
-              {{ about.title || '关于风驰思维魔方' }}
+              {{ about.title || '关于风驰思维' }}
             </h2>
             <div class="mt-4 space-y-3.5 text-[14px] leading-[1.85] text-ink-600">
               <p v-for="(para, i) in aboutParagraphs" :key="i">{{ para }}</p>
             </div>
+
+            <div v-if="contact.address" class="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ink-100 pt-4 text-[12.5px] text-ink-500">
+              <span class="inline-flex items-center gap-1.5">
+                <MapPin class="size-3.5" />{{ contact.address }}
+              </span>
+              <span v-if="contact.hours" class="inline-flex items-center gap-1.5">
+                <Clock class="size-3.5" />{{ contact.hours }}
+              </span>
+              <span v-if="contact.phone" class="inline-flex items-center gap-1.5">
+                <Phone class="size-3.5" />{{ contact.phone }}
+              </span>
+            </div>
           </div>
-          <div class="fc-cube-bg flex items-center justify-center border-t border-ink-200 bg-ink-50 p-8 lg:border-t-0 lg:border-l">
-            <div class="grid grid-cols-3 gap-2.5">
+
+          <div class="fc-cube-bg flex flex-col items-center justify-center gap-5 border-t border-ink-200 bg-ink-50 p-8 lg:border-t-0 lg:border-l">
+            <img
+              :src="assetUrl(brand.logo_mark_url)"
+              class="w-24 drop-shadow-lg lg:w-28"
+              :alt="brand.name"
+            />
+            <div class="grid grid-cols-4 gap-2">
               <div
                 v-for="(color, i) in cubeColors"
                 :key="i"
-                class="size-14 rounded-xl shadow-soft transition hover:scale-105"
+                class="size-9 rounded-lg shadow-soft"
                 :style="{ backgroundColor: color }"
               />
             </div>
+            <p v-if="brand.english_name" class="text-[11px] tracking-[0.2em] text-ink-400 uppercase">
+              {{ brand.english_name }}
+            </p>
           </div>
         </div>
       </div>
@@ -273,7 +411,7 @@
       <div class="rounded-2xl bg-brand-600 px-6 py-10 text-center shadow-lift lg:px-12">
         <h2 class="text-[22px] font-bold tracking-tight text-white">教师账号由机构统一开通</h2>
         <p class="mx-auto mt-3 max-w-xl text-[14px] leading-relaxed text-brand-100">
-          本系统面向风驰思维魔方机构内部教师使用。如需开通账号或重置密码，请联系机构超级管理员。
+          本系统面向风驰思维机构内部教师使用。如需开通账号或重置密码，请联系机构超级管理员。
         </p>
         <RouterLink
           :to="{ name: 'login' }"
@@ -293,95 +431,105 @@ import { RouterLink } from 'vue-router'
 import {
   ArrowDown,
   Boxes,
+  Check,
+  Clock,
   FolderOpen,
   GraduationCap,
-  Layers,
   LogIn,
+  MapPin,
+  Phone,
+  Quote,
   RefreshCw,
   Sparkles,
-  Target,
   Trophy,
   Users,
-  Zap,
 } from 'lucide-vue-next'
 import UiStat from '@/components/UiStat.vue'
 import UiBadge from '@/components/UiBadge.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
 import ResourceIcon from '@/components/ResourceIcon.vue'
-import { isSupabaseConfigured, supabase } from '@/lib/supabase'
+import TrackDot from '@/components/TrackDot.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSiteStore } from '@/stores/site'
 import { COURSE_STATUS } from '@/lib/dict'
+import { assetUrl } from '@/lib/assets'
 import { formatDuration, formatFileSize, relativeTime } from '@/lib/format'
 import { dashboardStats, recentCourses, recentResources } from '@/api/stats'
 import { recentGrades } from '@/api/grades'
-import { listCourses } from '@/api/courses'
+import { listCoaches } from '@/api/coaches'
 
 const auth = useAuthStore()
+const site = useSiteStore()
 
-const hero = ref({})
-const about = ref({})
-const highlights = ref([])
-const baseline = ref({})
-const publicCourses = ref([])
-
+const coaches = ref([])
 const stats = ref({})
 const recentCourseList = ref([])
 const recentResourceList = ref([])
 const recentGradeList = ref([])
 const loadingStats = ref(false)
 
-const cubeColors = ['#ef4444', '#facc15', '#3b82f6', '#f97316', '#ffffff', '#22c55e', '#22c55e', '#3b82f6', '#ef4444']
-const cubeGrid = [cubeColors.slice(0, 3), cubeColors.slice(3, 6), cubeColors.slice(6, 9)]
+const brand = computed(() => site.brand)
+const hero = computed(() => site.hero)
+const about = computed(() => site.about)
+const contact = computed(() => site.contact)
+const outcomes = computed(() => site.outcomes)
+const philosophy = computed(() => site.philosophy)
+const why = computed(() => site.why)
+const curriculum = computed(() => site.settings['home.curriculum'] || {})
 
-const highlightIcons = [Layers, Target, Trophy, Zap]
+const cubeColors = ['#EA625F', '#F2E926', '#93BC37', '#34B4E2', '#F0A020']
 
-const DEFAULT_HIGHLIGHTS = [
-  { title: '分层课程体系', desc: '启蒙 / 进阶 / 竞速 / 盲拧四阶递进，按年龄与基础匹配', color: '#3366ff' },
-  { title: '小班教练制', desc: '每班 6-8 人，教练跟进到人，进度可追踪', color: '#22c55e' },
-  { title: '阶段化测评', desc: '每个阶段有测评与成绩档案，成长看得见', color: '#f97316' },
-  { title: '教研资源共享', desc: '教案、公式图表、视频素材统一归档，团队共用', color: '#ef4444' },
+const capabilityTags = [
+  { text: '空间思维', color: '#EA625F' },
+  { text: '逻辑推理', color: '#F2E926' },
+  { text: '专注力', color: '#93BC37' },
+  { text: '抗挫能力', color: '#34B4E2' },
 ]
 
 const aboutParagraphs = computed(() => {
+  const raw = about.value?.paragraphs
+  if (Array.isArray(raw) && raw.length) return raw
   const content = about.value?.content || ''
   const list = String(content).split('\n').map((s) => s.trim()).filter(Boolean)
-  return list.length ? list : ['课程按认知发展阶段分层设计，形成完整的成长路径。']
+  return list.length ? list : []
+})
+
+const outcomeBlocks = computed(() => {
+  const list = []
+  if (outcomes.value?.cube?.items?.length) list.push({ ...outcomes.value.cube })
+  if (outcomes.value?.board?.items?.length) list.push({ ...outcomes.value.board })
+  return list
 })
 
 const baselineStats = computed(() => {
-  const b = baseline.value || {}
-  const list = [
+  const b = site.baseline || {}
+  return [
     { label: '在读学员', value: Number(b.students) || 0 },
     { label: '专业教练', value: Number(b.coaches) || 0 },
     { label: '累计课时', value: Number(b.lessons) || 0 },
     { label: '办学年数', value: Number(b.years) || 0 },
   ]
-  return list.filter((i) => i.value > 0).map((i) => ({ ...i, value: i.value.toLocaleString('zh-CN') }))
+    .filter((i) => i.value > 0)
+    .map((i) => ({ ...i, value: i.value.toLocaleString('zh-CN') }))
 })
+
+function coachMetrics(coach) {
+  const list = []
+  if (coach.years_competing) list.push({ label: '竞技生涯', value: coach.years_competing })
+  if (coach.years_teaching) list.push({ label: '教学经验', value: coach.years_teaching })
+  if (coach.avg_time) list.push({ label: '三阶平均', value: coach.avg_time })
+  return list
+}
 
 function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 }
 
-async function loadPublic() {
-  if (!isSupabaseConfigured) {
-    highlights.value = DEFAULT_HIGHLIGHTS
-    return
-  }
+async function loadCoaches() {
   try {
-    const { data } = await supabase
-      .from('site_settings')
-      .select('key, value')
-      .in('key', ['home.hero', 'home.about', 'home.highlights', 'stats.baseline'])
-    for (const row of data || []) {
-      if (row.key === 'home.hero') hero.value = row.value || {}
-      if (row.key === 'home.about') about.value = row.value || {}
-      if (row.key === 'home.highlights') highlights.value = row.value?.items || []
-      if (row.key === 'stats.baseline') baseline.value = row.value || {}
-    }
-    if (!highlights.value.length) highlights.value = DEFAULT_HIGHLIGHTS
+    coaches.value = await listCoaches()
   } catch {
-    highlights.value = DEFAULT_HIGHLIGHTS
+    coaches.value = []
   }
 }
 
@@ -400,27 +548,15 @@ async function loadDashboard() {
     recentResourceList.value = resources
     recentGradeList.value = grades
   } catch {
-    // 首页看板失败不影响主体展示
+    // 看板失败不影响首页主体
   } finally {
     loadingStats.value = false
   }
 }
 
-/** 未登录时展示课程体系概览（仅已上架课程的基础字段） */
-async function loadPublicCourses() {
-  if (auth.isLoggedIn || !isSupabaseConfigured) return
-  try {
-    const { items } = await listCourses({ status: 'published', pageSize: 4, paged: true })
-    publicCourses.value = items
-  } catch {
-    // 未登录无权限时静默跳过
-  }
-}
-
 onMounted(async () => {
-  await loadPublic()
-  if (auth.isLoggedIn) {
-    await loadDashboard()
-  }
+  // 师资为公开数据，未登录也能展示
+  loadCoaches()
+  if (auth.isLoggedIn) await loadDashboard()
 })
 </script>

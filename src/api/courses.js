@@ -16,6 +16,7 @@ function clean(kw) {
 export async function listCourses(params = {}) {
   const {
     keyword = '',
+    track = '',
     category = '',
     status = '',
     level = '',
@@ -28,6 +29,7 @@ export async function listCourses(params = {}) {
 
   const kw = clean(keyword)
   if (kw) query = query.or(`title.ilike.%${kw}%,subtitle.ilike.%${kw}%,summary.ilike.%${kw}%`)
+  if (track) query = query.eq('track', track)
   if (category) query = query.eq('category', category)
   if (status) query = query.eq('status', status)
   if (level) query = query.eq('level', Number(level))
@@ -48,10 +50,25 @@ export async function listCourses(params = {}) {
 export async function listCourseOptions() {
   const { data, error } = await supabase
     .from(TABLES.courses)
-    .select('id,title,category,level,status')
+    .select('id,title,track,category,level,status')
     .order('sort_order', { ascending: true })
   if (error) throw new Error(errorMessage(error, '加载课程选项失败'))
   return data || []
+}
+
+/** 按课程线统计已上架课程数量（用于首页双课程线展示） */
+export async function trackCounts() {
+  const { data, error } = await supabase
+    .from(TABLES.courseOverview)
+    .select('track')
+    .eq('status', 'published')
+  if (error) throw new Error(errorMessage(error, '统计课程线失败'))
+  const map = {}
+  for (const row of data || []) {
+    const key = row.track || '未分类'
+    map[key] = (map[key] || 0) + 1
+  }
+  return map
 }
 
 export async function getCourse(id) {

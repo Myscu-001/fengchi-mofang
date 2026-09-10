@@ -11,3 +11,6 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# 机构补充材料（源文件，仅本地参考，体积大，不进仓库）
+补充材料/

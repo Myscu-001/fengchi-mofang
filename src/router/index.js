@@ -66,6 +66,12 @@ const routes = [
         meta: { title: '角色权限', requiresAuth: true, permission: 'role.manage' },
       },
       {
+        path: 'admin/coaches',
+        name: 'admin-coaches',
+        component: () => import('@/views/admin/CoachesView.vue'),
+        meta: { title: '师资团队', requiresAuth: true, permission: 'coach.manage' },
+      },
+      {
         path: 'admin/settings',
         name: 'admin-settings',
         component: () => import('@/views/admin/SettingsView.vue'),

@@ -95,6 +95,40 @@ export function levelLabel(v) {
 
 export const LEVEL_OPTIONS = [1, 2, 3, 4, 5].map((v) => ({ value: v, label: `${v} · ${LEVEL_LABELS[v]}` }))
 
-export const COURSE_CATEGORY_OPTIONS = ['启蒙', '入门', '进阶', '竞速', '盲拧', '专项']
+export const COURSE_CATEGORY_OPTIONS = [
+  // 魔方线
+  '启蒙', '入门', '进阶', '提速', '高阶', '赛事', '专项',
+  // 桌游线
+  '初级', '中级', '高级',
+]
+
+/**
+ * 课程线。机构的课程体系分为「魔方」与「博弈桌游」两条线，
+ * 配色对应 LOGO 立方体上的两个面（红 / 绿）。
+ */
+export const TRACKS = [
+  {
+    value: '魔方',
+    label: '魔方课程',
+    short: '魔方',
+    color: '#E8564F',
+    deepColor: '#C43B36',
+    description: '从认知启蒙到竞速盲拧，由浅入深、循序渐进',
+  },
+  {
+    value: '桌游',
+    label: '博弈桌游',
+    short: '桌游',
+    color: '#93BC37',
+    deepColor: '#5F821F',
+    description: '在规则与博弈中建立策略思维与协作能力',
+  },
+]
+
+export const TRACK_OPTIONS = TRACKS.map((t) => ({ value: t.value, label: t.label }))
+
+export function trackMeta(value) {
+  return TRACKS.find((t) => t.value === value) || null
+}
 
 export const STUDENT_LEVEL_OPTIONS = ['新手', '入门', '熟练', '竞速']

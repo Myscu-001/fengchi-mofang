@@ -1,17 +1,21 @@
 <template>
-  <div class="flex items-center gap-2.5">
-    <svg :width="size" :height="size" viewBox="0 0 64 64" class="shrink-0 rounded-[10px]">
-      <rect width="64" height="64" rx="14" fill="#1f47f5" />
-      <rect x="8" y="8" width="14" height="14" rx="3" fill="#ef4444" />
-      <rect x="25" y="8" width="14" height="14" rx="3" fill="#facc15" />
-      <rect x="42" y="8" width="14" height="14" rx="3" fill="#3b82f6" />
-      <rect x="8" y="25" width="14" height="14" rx="3" fill="#f97316" />
-      <rect x="25" y="25" width="14" height="14" rx="3" fill="#ffffff" />
-      <rect x="42" y="25" width="14" height="14" rx="3" fill="#22c55e" />
-      <rect x="8" y="42" width="14" height="14" rx="3" fill="#22c55e" />
-      <rect x="25" y="42" width="14" height="14" rx="3" fill="#3b82f6" />
-      <rect x="42" y="42" width="14" height="14" rx="3" fill="#ef4444" />
-    </svg>
+  <!-- 完整标准字组合：立方体图标 + 中英文标准字（页脚、登录页使用） -->
+  <img
+    v-if="lockup"
+    :src="assetUrl(brand.logo_url)"
+    :style="{ height: `${size}px` }"
+    class="w-auto select-none"
+    :alt="brand.full_name || brand.name"
+  />
+
+  <!-- 图标 + 文字组合（导航栏使用，小尺寸下更清晰） -->
+  <div v-else class="flex items-center gap-2.5">
+    <img
+      :src="assetUrl(brand.logo_mark_url)"
+      :style="{ width: `${size}px`, height: `${size}px` }"
+      class="shrink-0 object-contain select-none"
+      :alt="brand.name"
+    />
     <div v-if="showText" class="leading-tight">
       <p class="text-[15px] font-semibold tracking-tight text-ink-900">
         {{ brand.name }}
@@ -22,12 +26,30 @@
 </template>
 
 <script setup>
-defineProps({
-  size: { type: Number, default: 34 },
+import { computed } from 'vue'
+import { assetUrl } from '@/lib/assets'
+
+const props = defineProps({
+  size: { type: Number, default: 36 },
   showText: { type: Boolean, default: true },
+  lockup: { type: Boolean, default: false },
   brand: {
     type: Object,
-    default: () => ({ name: '风驰思维魔方', sub: '教学管理系统' }),
+    default: () => ({}),
   },
 })
+
+const DEFAULTS = {
+  name: '风驰思维',
+  full_name: '风驰思维魔方教育',
+  logo_url: '/brand/logo.png',
+  logo_mark_url: '/brand/logo-mark.png',
+}
+
+// 站点配置加载完成后父组件会重新传入 brand，这里保持响应式
+const brand = computed(() => ({
+  ...DEFAULTS,
+  ...(props.brand || {}),
+  sub: props.brand?.sub || '教学管理系统',
+}))
 </script>

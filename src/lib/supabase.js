@@ -66,6 +66,7 @@ export const TABLES = {
   resourceCategories: 'resource_categories',
   resources: 'resources',
   downloads: 'resource_downloads',
+  coaches: 'coaches',
   siteSettings: 'site_settings',
 }
 

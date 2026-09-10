@@ -19,6 +19,7 @@ insert into public.permissions (code, name, module, description, sort_order) val
   ('user.manage',     '账号管理',     'system',   '创建/停用老师账号、重置密码、分配角色', 10),
   ('role.manage',     '角色权限配置', 'system',   '调整角色与权限点的对应关系',           20),
   ('settings.manage', '站点配置',     'system',   '维护首页文案与机构联系方式',           30),
+  ('coach.manage',    '师资管理',     'system',   '维护对外展示的教练团队信息',           40),
   ('course.view',     '查看课程',     'course',   '浏览课程与课时教案',                   100),
   ('course.manage',   '编辑课程',     'course',   '新建、修改、上下架课程与课时',         110),
   ('student.view',    '查看学员',     'student',  '浏览学员档案',                         200),
@@ -68,13 +69,14 @@ on conflict do nothing;
 -- 资源分类（两级，可按需继续扩展）
 -- -----------------------------------------------------------------------------
 insert into public.resource_categories (name, slug, parent_id, icon, color, description, sort_order) values
-  ('教学课件', 'courseware', null, 'Presentation', '#3366ff', '各阶段课程配套的课件与讲义', 10),
-  ('教案教研', 'lesson-plan', null, 'NotebookPen', '#22c55e', '教案、教研资料、教学法总结', 20),
-  ('公式图表', 'formula',    null, 'Grid3x3',      '#f97316', '公式表、指法图、色块对照图', 30),
-  ('赛事资料', 'competition', null, 'Trophy',      '#facc15', '赛事规则、报名表、成绩公示模板', 40),
-  ('音视频素材', 'media',    null, 'Video',        '#ef4444', '演示视频、课堂录音、背景音乐', 50),
-  ('品牌物料', 'brand',      null, 'Palette',      '#8b5cf6', '机构 LOGO、海报、宣传单页', 60),
-  ('其他资料', 'other',      null, 'FolderOpen',   '#64748b', '暂未归类的文件', 999)
+  ('教学课件', 'courseware', null, 'Presentation', '#E8564F', '各阶段课程配套的课件与讲义', 10),
+  ('教案教研', 'lesson-plan', null, 'NotebookPen', '#86B32A', '教案、教研资料、教学法总结', 20),
+  ('提速公式手册', 'formula-book', null, 'Grid3x3', '#F5C518', 'F2L / OLL / PLL 等提速公式练习手册', 25),
+  ('公式图表', 'formula',    null, 'Layers',       '#2FA3D1', '公式表、指法图、色块对照图', 30),
+  ('赛事资料', 'competition', null, 'Trophy',      '#F0A020', '赛事规则、报名表、成绩公示模板', 40),
+  ('音视频素材', 'media',    null, 'Video',        '#E8564F', '演示视频、课堂录音、背景音乐', 50),
+  ('品牌物料', 'brand',      null, 'Palette',      '#8B5CF6', '机构 LOGO、海报、宣传单页', 60),
+  ('其他资料', 'other',      null, 'FolderOpen',   '#64748B', '暂未归类的文件', 999)
 on conflict do nothing;
 
 -- -----------------------------------------------------------------------------
@@ -83,17 +85,17 @@ on conflict do nothing;
 insert into public.site_settings (key, value, description) values
   (
     'site.brand',
-    '{"name":"风驰思维魔方","full_name":"风驰思维魔方教育","slogan":"让每个孩子都用思维转动世界","logo_url":""}'::jsonb,
+    '{"name":"风驰思维","full_name":"风驰思维魔方教育","english_name":"FONGCHI EDUCATION","slogan":"专注 4 岁+ 教学 · 解锁新技能 · 发散新思维","logo_url":"/brand/logo.png","logo_mark_url":"/brand/logo-mark.png"}'::jsonb,
     '品牌名称与标语'
   ),
   (
     'site.contact',
-    '{"phone":"","wechat":"","email":"","address":"","hours":"周一至周日 09:00 - 21:00"}'::jsonb,
+    '{"phone":"","wechat":"","email":"","address":"深圳市福田区园东花园裙楼第二层 85 号商铺","hours":"周一至周日 09:00 - 21:00"}'::jsonb,
     '机构联系方式'
   ),
   (
     'home.hero',
-    '{"title":"风驰思维魔方","subtitle":"以魔方为载体，训练观察力、记忆力、空间想象力与专注力。我们不只是教会还原，更在意孩子思考的过程。","primary_cta":"进入教学管理","secondary_cta":"了解课程体系"}'::jsonb,
+    '{"title":"风驰思维","subtitle":"魔方 + 博弈桌游双课程线。我们以玩中学的方式，训练孩子的空间思维、逻辑推理与专注力，让他们在 AI 时代学会自主思考，做 AI 的主人。","primary_cta":"进入教学管理","secondary_cta":"了解课程体系"}'::jsonb,
     '首页首屏文案'
   ),
   (

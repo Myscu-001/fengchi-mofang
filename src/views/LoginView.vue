@@ -2,14 +2,15 @@
   <div class="flex min-h-screen bg-ink-50">
     <!-- 左侧品牌区 -->
     <div class="fc-cube-bg relative hidden w-[46%] flex-col justify-between border-r border-ink-200 bg-white p-10 lg:flex">
-      <LogoMark :size="40" />
+      <LogoMark :size="40" :brand="site.brand" />
 
       <div>
         <h1 class="text-[30px] leading-tight font-bold tracking-tight text-ink-900">
-          让每一次转动<br />都有据可循
+          让每一次思考<br />都有迹可循
         </h1>
         <p class="mt-4 max-w-sm text-[14px] leading-relaxed text-ink-600">
-          课程、学员、班级、成绩与教学资源，统一在风驰思维魔方的教学管理系统里沉淀下来。
+          魔方与博弈桌游两条课程线的课程、学员、班级、成绩与教学资源，
+          统一在{{ site.brand.name }}的教学管理系统里沉淀下来。
         </p>
 
         <ul class="mt-8 space-y-3">
@@ -39,12 +40,12 @@
     <div class="flex flex-1 items-center justify-center p-6">
       <div class="w-full max-w-[400px]">
         <div class="mb-8 lg:hidden">
-          <LogoMark :size="38" />
+          <LogoMark :size="38" :brand="site.brand" />
         </div>
 
         <h2 class="text-[22px] font-bold tracking-tight text-ink-900">教师登录</h2>
         <p class="mt-1.5 text-[13.5px] text-ink-500">
-          {{ brandName }} 内部教学管理系统
+          {{ site.brand.full_name }} · 教学管理系统
         </p>
 
         <div
@@ -147,11 +148,13 @@ import {
 import LogoMark from '@/components/LogoMark.vue'
 import UiField from '@/components/UiField.vue'
 import UiButton from '@/components/UiButton.vue'
-import { isSupabaseConfigured, supabase } from '@/lib/supabase'
+import { isSupabaseConfigured } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { useSiteStore } from '@/stores/site'
 import { useToastStore } from '@/stores/toast'
 
 const auth = useAuthStore()
+const site = useSiteStore()
 const toast = useToastStore()
 const router = useRouter()
 const route = useRoute()
@@ -160,29 +163,19 @@ const configured = isSupabaseConfigured
 const submitting = ref(false)
 const showPassword = ref(false)
 const errorMsg = ref('')
-const brandName = ref('风驰思维魔方')
 
 const form = reactive({ email: '', password: '' })
 
 const features = [
-  { icon: Boxes, title: '课程与教案', desc: '分层课程体系，课时教案在线维护' },
+  { icon: Boxes, title: '课程与教案', desc: '魔方与桌游双课程线，课时教案在线维护' },
   { icon: Users, title: '学员与班级', desc: '一人一档案，开班排课一目了然' },
   { icon: TrendingUp, title: '测评与成绩', desc: '阶段测评留痕，进步轨迹可回溯' },
 ]
 
-const cubeColors = ['#ef4444', '#facc15', '#3b82f6', '#f97316', '#22c55e']
+const cubeColors = ['#EA625F', '#F2E926', '#93BC37', '#34B4E2', '#EA625F']
 
-onMounted(async () => {
-  try {
-    const { data } = await supabase
-      .from('site_settings')
-      .select('value')
-      .eq('key', 'site.brand')
-      .maybeSingle()
-    if (data?.value?.name) brandName.value = data.value.name
-  } catch {
-    // 使用默认品牌名
-  }
+onMounted(() => {
+  site.load()
 })
 
 async function handleSubmit() {

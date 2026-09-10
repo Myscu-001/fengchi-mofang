@@ -90,11 +90,13 @@ create table if not exists public.courses (
   cover_url      text,
   summary        text,                                   -- 一句话简介
   description    text,                                   -- 详细介绍（富文本/多段）
-  category       text,                                   -- 课程分类：启蒙 / 进阶 / 竞速 / 盲拧 …
+  category       text,                                   -- 课程分类：启蒙 / 入门 / 进阶 / 提速 / 赛事 / 盲拧 …
+  track          text,                                   -- 课程线：魔方 / 桌游
   level          smallint not null default 1 check (level between 1 and 5),
   stage          text,                                   -- 适用阶段：幼儿 / 小学低年级 / 小学高年级 / 青少年
   age_range      text,                                   -- 适龄区间，如 5-7岁
   goal           text,                                   -- 课程目标
+  learning_outcomes text[] not null default '{}',        -- 学习收获（能力培养点）
   total_lessons  int not null default 0,
   lesson_minutes int not null default 45,
   price          numeric(10, 2) not null default 0,
@@ -282,6 +284,29 @@ create index if not exists idx_res_dl_resource on public.resource_downloads (res
 create index if not exists idx_res_dl_created on public.resource_downloads (created_at desc);
 
 -- -----------------------------------------------------------------------------
+-- 师资团队
+-- 说明：师资是「对外展示的教练团队」，与系统登录账号（profiles）刻意分离——
+--       教练不一定需要使用本系统，不应为了展示而建立登录账号。
+-- -----------------------------------------------------------------------------
+create table if not exists public.coaches (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  title          text,                                    -- 职务 / 头衔，如「竞速教练」
+  years_competing text,                                   -- 竞技生涯，如「9 年」
+  years_teaching  text,                                   -- 教学经验，如「7 年」
+  avg_time       text,                                    -- 三阶平均成绩，如「9s」
+  highlights     text[] not null default '{}',             -- 荣誉 / 专长条目
+  bio            text,
+  avatar_url     text,
+  sort_order     int not null default 100,
+  is_active      boolean not null default true,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create index if not exists idx_coaches_sort on public.coaches (sort_order, created_at);
+create index if not exists idx_coaches_active on public.coaches (is_active);
+
+-- -----------------------------------------------------------------------------
 -- 站点配置（首页文案、联系方式等 key-value）
 -- -----------------------------------------------------------------------------
 create table if not exists public.site_settings (
@@ -291,6 +316,13 @@ create table if not exists public.site_settings (
   updated_by  uuid references public.profiles(id) on delete set null,
   updated_at  timestamptz not null default now()
 );
+
+-- =============================================================================
+-- 增量字段（对已经建好的库补列，幂等；新库执行上面的 create table 时已包含）
+-- =============================================================================
+alter table public.courses add column if not exists track text;
+alter table public.courses add column if not exists learning_outcomes text[] not null default '{}';
+create index if not exists idx_courses_track on public.courses (track);
 
 -- =============================================================================
 -- 函数
@@ -497,7 +529,7 @@ declare
   t text;
   tables text[] := array[
     'profiles', 'courses', 'course_lessons', 'students', 'classes',
-    'assessments', 'grades', 'resource_categories', 'resources'
+    'assessments', 'grades', 'resource_categories', 'resources', 'coaches'
   ];
 begin
   foreach t in array tables loop
@@ -512,7 +544,10 @@ end $$;
 -- =============================================================================
 -- 视图
 -- =============================================================================
-create or replace view public.v_course_overview as
+-- 说明：用 drop + create 而非 create or replace，因为要调整列的顺序
+-- （create or replace 只允许在末尾追加列）。
+drop view if exists public.v_course_overview;
+create view public.v_course_overview as
 select
   c.id,
   c.title,
@@ -520,10 +555,14 @@ select
   c.slug,
   c.cover_url,
   c.summary,
+  c.track,
   c.category,
   c.level,
   c.stage,
   c.age_range,
+  c.goal,
+  c.learning_outcomes,
+  c.lesson_minutes,
   c.price,
   c.status,
   c.sort_order,
