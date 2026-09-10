@@ -1,0 +1,15 @@
+# 统一换行符，避免 Windows / Linux 之间产生无意义的差异
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+*.svg text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
