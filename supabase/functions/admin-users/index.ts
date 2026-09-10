@@ -17,16 +17,30 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? ''
 
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+const DEFAULT_ALLOWED_HEADERS =
+  'authorization, x-client-info, apikey, content-type, x-supabase-api-version'
+
+/**
+ * 按请求动态生成 CORS 头。
+ * 注意：supabase-js 会带上 x-supabase-api-version 等自定义头，如果白名单里没有，
+ * 浏览器的预检请求会直接失败（表现为「操作失败，请稍后重试」）。
+ * 这里直接回显浏览器声明的 Access-Control-Request-Headers，避免以后新增头再踩坑。
+ */
+function corsHeaders(req: Request): Record<string, string> {
+  const requested = req.headers.get('Access-Control-Request-Headers')
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': requested || DEFAULT_ALLOWED_HEADERS,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Access-Control-Request-Headers',
+  }
 }
 
-function json(body: unknown, status = 200): Response {
+function json(req: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   })
 }
 
@@ -109,23 +123,23 @@ function pickError(data: any, fallback: string): string {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
-  if (req.method !== 'POST') return json({ error: '仅支持 POST 请求' }, 405)
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) })
+  if (req.method !== 'POST') return json(req, { error: '仅支持 POST 请求' }, 405)
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return json({ error: '服务未正确配置（缺少环境变量）' }, 500)
+    return json(req, { error: '服务未正确配置（缺少环境变量）' }, 500)
   }
 
   try {
     const raw = req.headers.get('Authorization') ?? ''
     const token = raw.replace(/^Bearer\s+/i, '').trim()
-    if (!token) return json({ error: '缺少登录凭证' }, 401)
+    if (!token) return json(req, { error: '缺少登录凭证' }, 401)
 
     const caller = await getCaller(token)
-    if (!caller) return json({ error: '登录状态已失效，请重新登录' }, 401)
+    if (!caller) return json(req, { error: '登录状态已失效，请重新登录' }, 401)
 
     const guard = await assertCanManageUsers(caller.id)
-    if (!guard.ok) return json({ error: guard.reason }, 403)
+    if (!guard.ok) return json(req, { error: guard.reason }, 403)
 
     const body = await req.json().catch(() => ({} as any))
     const action = String(body?.action ?? '')
@@ -139,12 +153,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const fullName = String(body.full_name ?? '').trim()
       const roleCode = String(body.role_code ?? 'teacher')
 
-      if (!email || !email.includes('@')) return json({ error: '请填写有效的登录邮箱' }, 400)
-      if (password.length < 8) return json({ error: '密码长度至少 8 位' }, 400)
+      if (!email || !email.includes('@')) return json(req, { error: '请填写有效的登录邮箱' }, 400)
+      if (password.length < 8) return json(req, { error: '密码长度至少 8 位' }, 400)
 
       const roleCheck = await rest(`roles?code=eq.${encodeURIComponent(roleCode)}&select=code`)
       if (!roleCheck.ok || !Array.isArray(roleCheck.data) || roleCheck.data.length === 0) {
-        return json({ error: `角色 ${roleCode} 不存在` }, 400)
+        return json(req, { error: `角色 ${roleCode} 不存在` }, 400)
       }
 
       const created = await authAdmin('users', {
@@ -167,10 +181,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (!created.ok) {
         const message = pickError(created.data, '创建账号失败')
         const duplicated = created.status === 422 || /already|exists|registered/i.test(message)
-        return json({ error: duplicated ? '该邮箱已被使用，请更换或先到列表中查找' : message }, 400)
+        return json(req, { error: duplicated ? '该邮箱已被使用，请更换或先到列表中查找' : message }, 400)
       }
 
-      return json({
+      return json(req, {
         ok: true,
         user: { id: created.data?.id, email: created.data?.email },
       })
@@ -182,8 +196,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (action === 'reset-password') {
       const userId = String(body.user_id ?? '')
       const password = String(body.password ?? '')
-      if (!userId) return json({ error: '缺少用户 ID' }, 400)
-      if (password.length < 8) return json({ error: '密码长度至少 8 位' }, 400)
+      if (!userId) return json(req, { error: '缺少用户 ID' }, 400)
+      if (password.length < 8) return json(req, { error: '密码长度至少 8 位' }, 400)
 
       const updated = await authAdmin(`users/${userId}`, {
         method: 'PUT',
@@ -192,7 +206,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           user_metadata: { must_change_password: true },
         }),
       })
-      if (!updated.ok) return json({ error: pickError(updated.data, '重置密码失败') }, 400)
+      if (!updated.ok) return json(req, { error: pickError(updated.data, '重置密码失败') }, 400)
 
       await rest(`profiles?id=eq.${userId}`, {
         method: 'PATCH',
@@ -200,7 +214,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         body: JSON.stringify({ must_change_password: true }),
       })
 
-      return json({ ok: true })
+      return json(req, { ok: true })
     }
 
     // -------------------------------------------------------------------------
@@ -208,16 +222,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // -------------------------------------------------------------------------
     if (action === 'delete') {
       const userId = String(body.user_id ?? '')
-      if (!userId) return json({ error: '缺少用户 ID' }, 400)
-      if (userId === caller.id) return json({ error: '不能删除自己的账号' }, 400)
+      if (!userId) return json(req, { error: '缺少用户 ID' }, 400)
+      if (userId === caller.id) return json(req, { error: '不能删除自己的账号' }, 400)
 
       const removed = await authAdmin(`users/${userId}`, { method: 'DELETE' })
-      if (!removed.ok) return json({ error: pickError(removed.data, '删除账号失败') }, 400)
-      return json({ ok: true })
+      if (!removed.ok) return json(req, { error: pickError(removed.data, '删除账号失败') }, 400)
+      return json(req, { ok: true })
     }
 
-    return json({ error: `未知操作：${action || '(空)'}` }, 400)
+    return json(req, { error: `未知操作：${action || '(空)'}` }, 400)
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : '服务内部异常' }, 500)
+    return json(req, { error: err instanceof Error ? err.message : '服务内部异常' }, 500)
   }
 })

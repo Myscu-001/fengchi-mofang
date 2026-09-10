@@ -8,12 +8,20 @@ async function invokeAdmin(body) {
   const { data, error } = await supabase.functions.invoke('admin-users', { body })
 
   if (error) {
-    let message = '操作失败，请稍后重试'
+    // FunctionsHttpError 会把原始 Response 放在 error.context 里
+    let message = ''
     try {
       const detail = await error.context?.json?.()
-      if (detail?.error) message = detail.error
+      message = detail?.error || detail?.message || detail?.msg || ''
     } catch {
-      if (error.message) message = error.message
+      message = ''
+    }
+    if (!message) {
+      // 网络层失败（例如 CORS 预检被拒）拿不到 JSON 响应体，此时给出可区分的提示
+      message =
+        error.name === 'FunctionsFetchError'
+          ? '无法连接到账号服务，请检查网络后重试'
+          : error.message || '操作失败，请稍后重试'
     }
     throw new Error(message)
   }
