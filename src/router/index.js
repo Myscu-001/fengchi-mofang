@@ -30,16 +30,10 @@ const routes = [
         meta: { title: '学员档案', requiresAuth: true, permission: 'student.view' },
       },
       {
-        path: 'classes',
-        name: 'classes',
-        component: () => import('@/views/ClassesView.vue'),
-        meta: { title: '开班管理', requiresAuth: true, permission: 'class.view' },
-      },
-      {
-        path: 'grades',
-        name: 'grades',
-        component: () => import('@/views/GradesView.vue'),
-        meta: { title: '测评成绩', requiresAuth: true, permission: 'grade.view' },
+        path: 'students/:id',
+        name: 'student-detail',
+        component: () => import('@/views/StudentDetailView.vue'),
+        meta: { title: '学员档案', requiresAuth: true, permission: 'student.view' },
       },
       {
         path: 'resources',

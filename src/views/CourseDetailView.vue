@@ -71,15 +71,11 @@
                 <p class="text-[11.5px] text-ink-500">单课时长</p>
                 <p class="mt-0.5 text-[17px] font-semibold text-ink-900 tabular-nums">{{ course.lesson_minutes }}<span class="ml-0.5 text-[12px] font-normal text-ink-500">分</span></p>
               </div>
-              <div>
-                <p class="text-[11.5px] text-ink-500">关联资源</p>
-                <p class="mt-0.5 text-[17px] font-semibold text-ink-900 tabular-nums">{{ resources.length }}</p>
-              </div>
-              <div>
-                <p class="text-[11.5px] text-ink-500">开班数</p>
-                <p class="mt-0.5 text-[17px] font-semibold text-ink-900 tabular-nums">{{ classes.length }}</p>
-              </div>
-            </div>
+          <div>
+            <p class="text-[11.5px] text-ink-500">关联资源</p>
+            <p class="mt-0.5 text-[17px] font-semibold text-ink-900 tabular-nums">{{ resources.length }}</p>
+          </div>
+        </div>
 
             <div v-if="course.tags?.length" class="mt-4 flex flex-wrap gap-1.5">
               <span
@@ -276,31 +272,7 @@
         </div>
       </div>
 
-      <!-- 成绩概览 -->
-      <div v-else-if="activeTab === 'grades'" class="mt-5">
-        <div v-if="assessments.length" class="fc-card divide-y divide-ink-100">
-          <RouterLink
-            v-for="a in assessments"
-            :key="a.id"
-            :to="{ name: 'grades', query: { assessment: a.id } }"
-            class="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-ink-50"
-          >
-            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-              <Trophy class="size-4 text-amber-500" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-[13.5px] font-medium text-ink-800">{{ a.title }}</p>
-              <p class="text-[12px] text-ink-500">
-                {{ ASSESSMENT_TYPE[a.type]?.label }} · {{ formatDate(a.assessed_at) }} · {{ a.grade_count }} 条成绩
-              </p>
-            </div>
-            <ChevronRight class="size-4 shrink-0 text-ink-400" />
-          </RouterLink>
-        </div>
-        <div v-else class="fc-card">
-          <UiEmpty :icon="Trophy" title="暂无测评记录" description="为该课程创建阶段测评后，成绩会自动汇总到这里。" />
-        </div>
-      </div>
+      <!-- 关联资源结束 -->
     </div>
 
     <!-- 课程编辑弹窗 -->
@@ -358,7 +330,6 @@ import {
   ArrowUp,
   Boxes,
   ChevronDown,
-  ChevronRight,
   Download,
   Eye,
   EyeOff,
@@ -368,7 +339,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Trophy,
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
@@ -381,9 +351,7 @@ import ResourceIcon from '@/components/ResourceIcon.vue'
 import CourseFormModal from '@/components/CourseFormModal.vue'
 import { getCourse, updateCourse, deleteCourse, listLessons, createLesson, updateLesson, deleteLesson, reorderLessons } from '@/api/courses'
 import { listResources, downloadResource } from '@/api/resources'
-import { listAssessments } from '@/api/grades'
-import { listClasses } from '@/api/classes'
-import { COURSE_STATUS, ASSESSMENT_TYPE, levelLabel } from '@/lib/dict'
+import { COURSE_STATUS, levelLabel } from '@/lib/dict'
 import { formatDate, formatDateTime, formatFileSize } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -400,8 +368,6 @@ const canManage = computed(() => auth.can('course.manage'))
 const course = ref(null)
 const lessons = ref([])
 const resources = ref([])
-const assessments = ref([])
-const classes = ref([])
 const loading = ref(true)
 const activeTab = ref('info')
 const expandedLesson = ref(null)
@@ -437,7 +403,6 @@ const tabs = computed(() => [
   { key: 'info', label: '课程信息', icon: Boxes },
   { key: 'lessons', label: '课时教案', icon: NotebookPen, count: lessons.value.length },
   { key: 'resources', label: '关联资源', icon: FolderOpen, count: resources.value.length },
-  { key: 'grades', label: '成绩概览', icon: Trophy, count: assessments.value.length },
 ])
 
 async function loadAll() {
@@ -449,14 +414,10 @@ async function loadAll() {
 
     const tasks = [listLessons(id)]
     tasks.push(auth.can('resource.view') ? listResources({ courseId: id, pageSize: 50 }) : Promise.resolve({ items: [] }))
-    tasks.push(auth.can('grade.view') ? listAssessments({ courseId: id, pageSize: 50 }) : Promise.resolve({ items: [] }))
-    tasks.push(auth.can('class.view') ? listClasses({ courseId: id }) : Promise.resolve({ items: [] }))
 
-    const [lessonList, resourceList, assessmentList, classList] = await Promise.all(tasks)
+    const [lessonList, resourceList] = await Promise.all(tasks)
     lessons.value = lessonList
     resources.value = resourceList.items || []
-    assessments.value = assessmentList.items || []
-    classes.value = classList.items || []
   } catch (err) {
     toast.error(err.message)
   } finally {

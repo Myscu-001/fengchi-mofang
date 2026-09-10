@@ -74,24 +74,3 @@ export async function deleteStudent(id) {
   const { error } = await supabase.from(TABLES.students).delete().eq('id', id)
   if (error) throw new Error(errorMessage(error, '删除学员失败'))
 }
-
-/** 学员所在班级 */
-export async function listStudentClasses(studentId) {
-  const { data, error } = await supabase
-    .from(TABLES.classMembers)
-    .select('id,status,joined_at,class:classes(id,name,status,room,weekday,start_time,course:courses(title))')
-    .eq('student_id', studentId)
-  if (error) throw new Error(errorMessage(error, '加载学员班级失败'))
-  return data || []
-}
-
-/** 学员成绩记录 */
-export async function listStudentGrades(studentId) {
-  const { data, error } = await supabase
-    .from(TABLES.studentGrades)
-    .select('*')
-    .eq('student_id', studentId)
-    .order('assessed_at', { ascending: false })
-  if (error) throw new Error(errorMessage(error, '加载学员成绩失败'))
-  return data || []
-}

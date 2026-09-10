@@ -108,11 +108,11 @@
       <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <UiStat label="课程总数" :value="stats.courseTotal" :hint="`已上架 ${stats.coursePublished} 门`" :icon="Boxes" tone="brand" />
         <UiStat label="在读学员" :value="stats.studentActive" :hint="`档案共 ${stats.studentTotal} 人`" :icon="Users" tone="green" />
-        <UiStat label="进行中班级" :value="stats.classActive" :hint="`累计开班 ${stats.classTotal} 个`" :icon="GraduationCap" tone="orange" />
-        <UiStat label="教学资源" :value="stats.resourceTotal" :hint="`测评 ${stats.assessmentTotal} 次`" :icon="FolderOpen" tone="violet" />
+        <UiStat label="魔方成绩" :value="stats.scoreTotal" :hint="`累计录入记录`" :icon="Trophy" tone="orange" />
+        <UiStat label="教学资源" :value="stats.resourceTotal" :hint="`机构资料库`" :icon="FolderOpen" tone="violet" />
       </div>
 
-      <div class="mt-5 grid gap-4 lg:grid-cols-3">
+      <div class="mt-5 grid gap-4 lg:grid-cols-2">
         <div class="fc-card p-4.5">
           <div class="flex items-center justify-between">
             <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
@@ -157,31 +157,6 @@
             </li>
           </ul>
           <p v-else class="py-6 text-center text-[13px] text-ink-400">暂无资源</p>
-        </div>
-
-        <div class="fc-card p-4.5">
-          <div class="flex items-center justify-between">
-            <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
-              <Trophy class="size-4 text-cube-yellow-deep" />最近成绩
-            </h3>
-            <RouterLink :to="{ name: 'grades' }" class="text-xs text-brand-600 hover:underline">全部</RouterLink>
-          </div>
-          <ul v-if="recentGradeList.length" class="mt-3 divide-y divide-ink-100">
-            <li v-for="g in recentGradeList" :key="g.id" class="flex items-center gap-3 py-2.5">
-              <UiAvatar :name="g.student_name" size="sm" />
-              <div class="min-w-0 flex-1">
-                <p class="line-clamp-1 text-[13px] font-medium text-ink-800">{{ g.student_name }}</p>
-                <p class="line-clamp-1 text-[11.5px] text-ink-400">{{ g.assessment_title }}</p>
-              </div>
-              <div class="text-right">
-                <p class="text-[13px] font-semibold text-brand-700 tabular-nums">{{ g.score ?? '—' }}</p>
-                <p v-if="g.duration_ms" class="text-[11px] text-ink-400 tabular-nums">
-                  {{ formatDuration(g.duration_ms) }}
-                </p>
-              </div>
-            </li>
-          </ul>
-          <p v-else class="py-6 text-center text-[13px] text-ink-400">暂无成绩记录</p>
         </div>
       </div>
     </section>
@@ -434,7 +409,6 @@ import {
   Check,
   Clock,
   FolderOpen,
-  GraduationCap,
   LogIn,
   MapPin,
   Phone,
@@ -455,7 +429,6 @@ import { COURSE_STATUS } from '@/lib/dict'
 import { assetUrl } from '@/lib/assets'
 import { formatDuration, formatFileSize, relativeTime } from '@/lib/format'
 import { dashboardStats, recentCourses, recentResources } from '@/api/stats'
-import { recentGrades } from '@/api/grades'
 import { listCoaches } from '@/api/coaches'
 
 const auth = useAuthStore()
@@ -465,7 +438,6 @@ const coaches = ref([])
 const stats = ref({})
 const recentCourseList = ref([])
 const recentResourceList = ref([])
-const recentGradeList = ref([])
 const loadingStats = ref(false)
 
 const brand = computed(() => site.brand)
@@ -537,16 +509,14 @@ async function loadDashboard() {
   if (!auth.isLoggedIn) return
   loadingStats.value = true
   try {
-    const [s, courses, resources, grades] = await Promise.all([
+    const [s, courses, resources] = await Promise.all([
       dashboardStats(),
       auth.can('course.view') ? recentCourses(5) : Promise.resolve([]),
       auth.can('resource.view') ? recentResources(5) : Promise.resolve([]),
-      auth.can('grade.view') ? recentGrades(5) : Promise.resolve([]),
     ])
     stats.value = s
     recentCourseList.value = courses
     recentResourceList.value = resources
-    recentGradeList.value = grades
   } catch {
     // 看板失败不影响首页主体
   } finally {

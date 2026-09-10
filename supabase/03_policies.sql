@@ -16,10 +16,6 @@ alter table public.profiles            enable row level security;
 alter table public.courses             enable row level security;
 alter table public.course_lessons      enable row level security;
 alter table public.students            enable row level security;
-alter table public.classes             enable row level security;
-alter table public.class_members       enable row level security;
-alter table public.assessments         enable row level security;
-alter table public.grades              enable row level security;
 alter table public.resource_categories enable row level security;
 alter table public.resources           enable row level security;
 alter table public.resource_downloads  enable row level security;
@@ -118,52 +114,6 @@ create policy students_manage on public.students
   for all to authenticated
   using (public.has_perm('student.manage'))
   with check (public.has_perm('student.manage'));
-
--- -----------------------------------------------------------------------------
--- 班级
--- -----------------------------------------------------------------------------
-drop policy if exists classes_select on public.classes;
-create policy classes_select on public.classes
-  for select to authenticated using (public.has_perm('class.view'));
-
-drop policy if exists classes_manage on public.classes;
-create policy classes_manage on public.classes
-  for all to authenticated
-  using (public.has_perm('class.manage'))
-  with check (public.has_perm('class.manage'));
-
-drop policy if exists class_members_select on public.class_members;
-create policy class_members_select on public.class_members
-  for select to authenticated using (public.has_perm('class.view'));
-
-drop policy if exists class_members_manage on public.class_members;
-create policy class_members_manage on public.class_members
-  for all to authenticated
-  using (public.has_perm('class.manage'))
-  with check (public.has_perm('class.manage'));
-
--- -----------------------------------------------------------------------------
--- 测评 / 成绩
--- -----------------------------------------------------------------------------
-drop policy if exists assessments_select on public.assessments;
-create policy assessments_select on public.assessments
-  for select to authenticated using (public.has_perm('grade.view'));
-
-drop policy if exists assessments_manage on public.assessments;
-create policy assessments_manage on public.assessments
-  for all to authenticated
-  using (public.has_perm('grade.manage'))
-  with check (public.has_perm('grade.manage'));
-
-drop policy if exists grades_select on public.grades;
-create policy grades_select on public.grades
-  for select to authenticated using (public.has_perm('grade.view'));
-
-drop policy if exists grades_manage on public.grades;
-create policy grades_manage on public.grades
-  for all to authenticated
-  using (public.has_perm('grade.manage'))
-  with check (public.has_perm('grade.manage'));
 
 -- -----------------------------------------------------------------------------
 -- 资源

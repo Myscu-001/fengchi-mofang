@@ -57,12 +57,12 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-ink-100">
-              <tr v-for="s in students" :key="s.id" class="transition hover:bg-ink-50/70">
+              <tr v-for="s in students" :key="s.id" class="cursor-pointer transition hover:bg-ink-50/70" @click="openDetail(s)">
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2.5">
                     <UiAvatar :src="s.avatar_url" :name="s.name" size="sm" />
                     <div class="min-w-0">
-                      <p class="truncate font-medium text-ink-800">{{ s.name }}</p>
+                      <p class="truncate font-medium text-ink-800 group-hover:text-brand-700">{{ s.name }}</p>
                       <p v-if="s.nickname" class="truncate text-[11.5px] text-ink-400">{{ s.nickname }}</p>
                     </div>
                   </div>
@@ -85,14 +85,14 @@
                   <UiBadge :label="STUDENT_STATUS[s.status]?.label" :custom-class="STUDENT_STATUS[s.status]?.style" />
                 </td>
                 <td class="px-4 py-3">
-                  <div class="flex justify-end gap-1">
-                    <button
+                  <div class="flex justify-end gap-1" @click.stop>
+                    <RouterLink
+                      :to="{ name: 'student-detail', params: { id: s.id } }"
                       class="rounded-lg p-1.5 text-ink-400 transition hover:bg-brand-50 hover:text-brand-600"
-                      title="查看档案"
-                      @click="openDetail(s)"
+                      title="查看完整档案 / 魔方成绩"
                     >
                       <Eye class="size-3.5" />
-                    </button>
+                    </RouterLink>
                     <template v-if="canManage">
                       <button
                         class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
@@ -216,78 +216,13 @@
       </template>
     </UiModal>
 
-    <!-- 学员档案详情 -->
-    <UiModal :open="detailOpen" :title="current?.name" :subtitle="current?.nickname || ''" width="lg" @close="detailOpen = false">
-      <div v-if="detailLoading" class="py-8"><UiLoading text="正在加载档案…" /></div>
-      <div v-else class="space-y-5">
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div v-for="item in detailFacts" :key="item.label">
-            <p class="text-[11.5px] text-ink-500">{{ item.label }}</p>
-            <p class="mt-0.5 text-[14px] font-medium text-ink-800">{{ item.value }}</p>
-          </div>
-        </div>
-
-        <div v-if="current?.notes">
-          <p class="text-[12px] font-semibold text-ink-500">备注</p>
-          <p class="mt-1 text-[13px] leading-relaxed text-ink-600">{{ current.notes }}</p>
-        </div>
-
-        <div>
-          <h4 class="text-[13px] font-semibold text-ink-800">所在班级</h4>
-          <ul v-if="studentClasses.length" class="mt-2 divide-y divide-ink-100 rounded-xl border border-ink-200">
-            <li v-for="m in studentClasses" :key="m.id" class="flex items-center justify-between px-3.5 py-2.5">
-              <div>
-                <p class="text-[13px] font-medium text-ink-800">{{ m.class?.name }}</p>
-                <p class="text-[11.5px] text-ink-400">{{ m.class?.course?.title || '未关联课程' }}</p>
-              </div>
-              <UiBadge :label="CLASS_STATUS[m.class?.status]?.label" :custom-class="CLASS_STATUS[m.class?.status]?.style" />
-            </li>
-          </ul>
-          <p v-else class="mt-2 text-[13px] text-ink-400">暂未加入班级</p>
-        </div>
-
-        <div>
-          <h4 class="text-[13px] font-semibold text-ink-800">成绩记录</h4>
-          <div v-if="studentGrades.length" class="mt-2 overflow-hidden rounded-xl border border-ink-200">
-            <table class="w-full text-left text-[12.5px]">
-              <thead class="border-b border-ink-200 bg-ink-50 text-[11.5px] text-ink-500">
-                <tr>
-                  <th class="px-3.5 py-2 font-medium">测评</th>
-                  <th class="px-3.5 py-2 font-medium">日期</th>
-                  <th class="px-3.5 py-2 font-medium">得分</th>
-                  <th class="px-3.5 py-2 font-medium">耗时</th>
-                  <th class="px-3.5 py-2 font-medium">等级</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-ink-100">
-                <tr v-for="g in studentGrades" :key="g.id">
-                  <td class="px-3.5 py-2 text-ink-700">{{ g.assessment_title }}</td>
-                  <td class="px-3.5 py-2 text-ink-500">{{ formatDate(g.assessed_at) }}</td>
-                  <td class="px-3.5 py-2 font-medium text-brand-700 tabular-nums">
-                    {{ g.score ?? '—' }}<span class="text-ink-400">/{{ g.max_score }}</span>
-                  </td>
-                  <td class="px-3.5 py-2 text-ink-600 tabular-nums">{{ formatDuration(g.duration_ms) }}</td>
-                  <td class="px-3.5 py-2 text-ink-600">{{ g.level || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-else class="mt-2 text-[13px] text-ink-400">暂无成绩记录</p>
-        </div>
-      </div>
-
-      <template #footer>
-        <UiButton variant="outline" @click="detailOpen = false">关闭</UiButton>
-        <UiButton v-if="canManage" variant="primary" @click="openForm(current); detailOpen = false">
-          编辑档案
-        </UiButton>
-      </template>
-    </UiModal>
+    <!-- 学员档案详情已迁移至独立的学员子页面（StudentDetailView） -->
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import {
   Eye,
   PauseCircle,
@@ -315,11 +250,9 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
-  listStudentClasses,
-  listStudentGrades,
 } from '@/api/students'
-import { STUDENT_STATUS, STUDENT_STATUS_OPTIONS, STUDENT_LEVEL_OPTIONS, CLASS_STATUS } from '@/lib/dict'
-import { formatDate, formatDuration } from '@/lib/format'
+import { STUDENT_STATUS, STUDENT_STATUS_OPTIONS, STUDENT_LEVEL_OPTIONS } from '@/lib/dict'
+import { formatDate } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
@@ -343,11 +276,7 @@ const editing = ref(null)
 const saving = ref(false)
 const errorMsg = ref('')
 
-const detailOpen = ref(false)
-const current = ref(null)
-const detailLoading = ref(false)
-const studentClasses = ref([])
-const studentGrades = ref([])
+const router = useRouter()
 
 const blank = () => ({
   name: '',
@@ -368,20 +297,6 @@ const blank = () => ({
 
 const form = reactive(blank())
 
-const detailFacts = computed(() => {
-  const c = current.value || {}
-  return [
-    { label: '性别', value: { male: '男', female: '女', unknown: '未填写' }[c.gender] || '—' },
-    { label: '年龄', value: ageOf(c.birthday) },
-    { label: '家长', value: c.guardian_name || '—' },
-    { label: '联系电话', value: c.guardian_phone || c.phone || '—' },
-    { label: '学校', value: c.school || '—' },
-    { label: '年级', value: c.grade || '—' },
-    { label: '当前水平', value: c.level || '—' },
-    { label: '加入时间', value: formatDate(c.joined_at) },
-  ]
-})
-
 function ageOf(birthday) {
   if (!birthday) return '—'
   const d = new Date(birthday)
@@ -391,6 +306,10 @@ function ageOf(birthday) {
   const m = now.getMonth() - d.getMonth()
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1
   return age >= 0 && age < 120 ? `${age} 岁` : '—'
+}
+
+function openDetail(s) {
+  router.push({ name: 'student-detail', params: { id: s.id } })
 }
 
 async function load() {
@@ -492,25 +411,6 @@ async function remove(student) {
     await Promise.all([load(), loadCounts()])
   } catch (err) {
     toast.error(err.message)
-  }
-}
-
-async function openDetail(student) {
-  current.value = student
-  detailOpen.value = true
-  detailLoading.value = true
-  try {
-    const tasks = [listStudentClasses(student.id)]
-    tasks.push(auth.can('grade.view') ? listStudentGrades(student.id) : Promise.resolve([]))
-    const [classes, grades] = await Promise.all(tasks)
-    studentClasses.value = classes
-    studentGrades.value = grades
-  } catch (err) {
-    toast.error(err.message)
-    studentClasses.value = []
-    studentGrades.value = []
-  } finally {
-    detailLoading.value = false
   }
 }
 

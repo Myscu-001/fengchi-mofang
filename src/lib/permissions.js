@@ -10,10 +10,8 @@ export const PERMISSIONS = {
   COURSE_MANAGE: 'course.manage',
   STUDENT_VIEW: 'student.view',
   STUDENT_MANAGE: 'student.manage',
-  CLASS_VIEW: 'class.view',
-  CLASS_MANAGE: 'class.manage',
-  GRADE_VIEW: 'grade.view',
-  GRADE_MANAGE: 'grade.manage',
+  SCORE_VIEW: 'score.view',
+  SCORE_MANAGE: 'score.manage',
   RESOURCE_VIEW: 'resource.view',
   RESOURCE_MANAGE: 'resource.manage',
 }
@@ -42,6 +40,6 @@ export function roleStyle(code) {
 
 export const ROLE_OPTIONS = [
   { value: 'admin', label: '超级管理员', desc: '全部权限，含账号与站点配置' },
-  { value: 'teacher', label: '机构老师', desc: '课程 / 学员 / 班级 / 成绩 / 资源全流程' },
+  { value: 'teacher', label: '机构老师', desc: '课程 / 学员 / 魔方成绩 / 资源全流程' },
   { value: 'assistant', label: '助教', desc: '查看为主，可录入成绩与上传资源' },
 ]

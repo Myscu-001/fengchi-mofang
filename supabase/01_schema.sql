@@ -17,14 +17,6 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type public.class_status as enum ('planning', 'active', 'finished', 'canceled');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type public.assessment_type as enum ('quiz', 'stage', 'competition', 'practice');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
   create type public.file_kind as enum ('document', 'pdf', 'sheet', 'slide', 'image', 'video', 'archive', 'other');
 exception when duplicate_object then null; end $$;
 
@@ -156,80 +148,6 @@ create table if not exists public.students (
 create index if not exists idx_students_name on public.students (name);
 create index if not exists idx_students_status on public.students (status);
 create index if not exists idx_students_joined on public.students (joined_at desc);
-
--- -----------------------------------------------------------------------------
--- 班级 / 开班
--- -----------------------------------------------------------------------------
-create table if not exists public.classes (
-  id            uuid primary key default gen_random_uuid(),
-  name          text not null,
-  course_id     uuid references public.courses(id) on delete set null,
-  teacher_id    uuid references public.profiles(id) on delete set null,
-  room          text,
-  weekday       smallint check (weekday between 1 and 7),  -- 1=周一
-  start_time    time,
-  end_time      time,
-  start_date    date,
-  end_date      date,
-  capacity      int not null default 8,
-  status        public.class_status not null default 'planning',
-  notes         text,
-  created_by    uuid references public.profiles(id) on delete set null,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-create index if not exists idx_classes_course on public.classes (course_id);
-create index if not exists idx_classes_teacher on public.classes (teacher_id);
-create index if not exists idx_classes_status on public.classes (status);
-
-create table if not exists public.class_members (
-  id         uuid primary key default gen_random_uuid(),
-  class_id   uuid not null references public.classes(id) on delete cascade,
-  student_id uuid not null references public.students(id) on delete cascade,
-  joined_at  date not null default current_date,
-  status     text not null default 'active' check (status in ('active', 'left')),
-  created_at timestamptz not null default now(),
-  unique (class_id, student_id)
-);
-create index if not exists idx_class_members_student on public.class_members (student_id);
-
--- -----------------------------------------------------------------------------
--- 测评 / 成绩
--- -----------------------------------------------------------------------------
-create table if not exists public.assessments (
-  id          uuid primary key default gen_random_uuid(),
-  title       text not null,
-  course_id   uuid references public.courses(id) on delete set null,
-  class_id    uuid references public.classes(id) on delete set null,
-  type        public.assessment_type not null default 'stage',
-  max_score   numeric(6, 2) not null default 100,
-  pass_score  numeric(6, 2),
-  assessed_at date not null default current_date,
-  description text,
-  created_by  uuid references public.profiles(id) on delete set null,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-create index if not exists idx_assessments_course on public.assessments (course_id);
-create index if not exists idx_assessments_date on public.assessments (assessed_at desc);
-
-create table if not exists public.grades (
-  id            uuid primary key default gen_random_uuid(),
-  assessment_id uuid not null references public.assessments(id) on delete cascade,
-  student_id    uuid not null references public.students(id) on delete cascade,
-  score         numeric(6, 2),
-  duration_ms   int,                                      -- 三阶复原耗时（毫秒）
-  rank          int,
-  level         text,                                     -- 评定等级 A / B / C
-  is_pass       boolean,
-  comment       text,
-  recorded_by   uuid references public.profiles(id) on delete set null,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now(),
-  unique (assessment_id, student_id)
-);
-create index if not exists idx_grades_student on public.grades (student_id);
-create index if not exists idx_grades_assessment on public.grades (assessment_id);
 
 -- -----------------------------------------------------------------------------
 -- 资源分类 / 资源文件
@@ -528,8 +446,8 @@ do $$
 declare
   t text;
   tables text[] := array[
-    'profiles', 'courses', 'course_lessons', 'students', 'classes',
-    'assessments', 'grades', 'resource_categories', 'resources', 'coaches'
+    'profiles', 'courses', 'course_lessons', 'students',
+    'resource_categories', 'resources', 'coaches'
   ];
 begin
   foreach t in array tables loop
@@ -570,7 +488,6 @@ select
   c.created_at,
   c.updated_at,
   coalesce(l.lesson_count, 0)  as lesson_count,
-  coalesce(s.student_count, 0) as student_count,
   coalesce(r.resource_count, 0) as resource_count
 from public.courses c
 left join (
@@ -578,52 +495,16 @@ left join (
     from public.course_lessons group by course_id
 ) l on l.course_id = c.id
 left join (
-  select co.id as course_id, count(distinct cm.student_id)::int as student_count
-    from public.classes co
-    join public.class_members cm on cm.class_id = co.id and cm.status = 'active'
-   group by co.id
-) s on s.course_id = c.id
-left join (
   select course_id, count(*)::int as resource_count
     from public.resources group by course_id
 ) r on r.course_id = c.id;
 
-create or replace view public.v_student_grade as
-select
-  g.id,
-  g.assessment_id,
-  g.student_id,
-  st.name       as student_name,
-  st.level      as student_level,
-  a.title       as assessment_title,
-  a.type        as assessment_type,
-  a.max_score,
-  a.assessed_at,
-  a.course_id,
-  c.title       as course_title,
-  a.class_id,
-  g.score,
-  g.duration_ms,
-  g.rank,
-  g.level,
-  g.is_pass,
-  g.comment,
-  g.recorded_by,
-  g.created_at
-from public.grades g
-join public.students st    on st.id = g.student_id
-join public.assessments a  on a.id = g.assessment_id
-left join public.courses c on c.id = a.course_id;
-
 -- 关键：PostgreSQL 15+ 视图默认以「定义者权限」执行，会绕过底层表的 RLS。
 -- 必须切换为「调用者权限」，让视图继承访问者的行级安全策略。
 alter view public.v_course_overview set (security_invoker = on);
-alter view public.v_student_grade  set (security_invoker = on);
 
 grant select on public.v_course_overview to authenticated;
-grant select on public.v_student_grade  to authenticated;
 grant select on public.v_course_overview to service_role;
-grant select on public.v_student_grade  to service_role;
 
 -- =============================================================================
 -- 权限授予（RLS 仍然生效，这里只是补齐 grant）

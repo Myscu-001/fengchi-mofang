@@ -15,21 +15,17 @@ export async function dashboardStats() {
     coursePublished,
     studentTotal,
     studentActive,
-    classTotal,
-    classActive,
+    scoreTotal,
     resourceTotal,
     staffTotal,
-    assessmentTotal,
   ] = await Promise.all([
     countOf(TABLES.courses),
     countOf(TABLES.courses, (q) => q.eq('status', 'published')),
     countOf(TABLES.students),
     countOf(TABLES.students, (q) => q.eq('status', 'active')),
-    countOf(TABLES.classes),
-    countOf(TABLES.classes, (q) => q.eq('status', 'active')),
+    countOf(TABLES.scores),
     countOf(TABLES.resources),
     countOf(TABLES.profiles, (q) => q.eq('status', 'active')),
-    countOf(TABLES.assessments),
   ])
 
   return {
@@ -37,11 +33,9 @@ export async function dashboardStats() {
     coursePublished,
     studentTotal,
     studentActive,
-    classTotal,
-    classActive,
+    scoreTotal,
     resourceTotal,
     staffTotal,
-    assessmentTotal,
   }
 }
 

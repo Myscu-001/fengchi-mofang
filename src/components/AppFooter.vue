@@ -75,8 +75,6 @@ const hasContact = computed(() =>
 const allLinks = [
   { label: '课程体系', to: { name: 'courses' }, perm: 'course.view' },
   { label: '学员档案', to: { name: 'students' }, perm: 'student.view' },
-  { label: '开班管理', to: { name: 'classes' }, perm: 'class.view' },
-  { label: '测评成绩', to: { name: 'grades' }, perm: 'grade.view' },
   { label: '资源中心', to: { name: 'resources' }, perm: 'resource.view' },
   { label: '个人中心', to: { name: 'profile' }, perm: '' },
 ]

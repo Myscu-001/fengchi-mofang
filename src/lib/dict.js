@@ -35,27 +35,6 @@ export const STUDENT_STATUS_OPTIONS = [
   { value: 'left', label: '退学' },
 ]
 
-export const CLASS_STATUS = {
-  planning: { label: '筹备中', style: 'bg-ink-100 text-ink-600 border-ink-200' },
-  active: { label: '进行中', style: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  finished: { label: '已结班', style: 'bg-brand-50 text-brand-700 border-brand-200' },
-  canceled: { label: '已取消', style: 'bg-red-50 text-red-600 border-red-200' },
-}
-
-export const ASSESSMENT_TYPE = {
-  quiz: { label: '随堂测', style: 'bg-ink-100 text-ink-600 border-ink-200' },
-  stage: { label: '阶段测评', style: 'bg-brand-50 text-brand-700 border-brand-200' },
-  competition: { label: '赛事', style: 'bg-amber-50 text-amber-700 border-amber-200' },
-  practice: { label: '日常练习', style: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-}
-
-export const ASSESSMENT_TYPE_OPTIONS = [
-  { value: 'quiz', label: '随堂测' },
-  { value: 'stage', label: '阶段测评' },
-  { value: 'competition', label: '赛事' },
-  { value: 'practice', label: '日常练习' },
-]
-
 export const FILE_KIND = {
   document: { label: '文档', icon: 'FileText', style: 'bg-brand-50 text-brand-700 border-brand-200' },
   pdf: { label: 'PDF', icon: 'FileType', style: 'bg-red-50 text-red-600 border-red-200' },
@@ -72,18 +51,23 @@ export const FILE_KIND_OPTIONS = Object.entries(FILE_KIND).map(([value, v]) => (
   label: v.label,
 }))
 
-export const WEEKDAYS = [
-  { value: 1, label: '周一' },
-  { value: 2, label: '周二' },
-  { value: 3, label: '周三' },
-  { value: 4, label: '周四' },
-  { value: 5, label: '周五' },
-  { value: 6, label: '周六' },
-  { value: 7, label: '周日' },
+export const STUDENT_LEVEL_OPTIONS = ['新手', '入门', '熟练', '竞速']
+
+/**
+ * 魔方项目字典。学员成绩按项目独立存储与统计。
+ * value 与数据库 cube_project 枚举保持一致；color 用于成绩趋势图与标识。
+ */
+export const CUBE_PROJECTS = [
+  { value: '2x2', label: '二阶', short: '2×2', color: '#EA625F' },
+  { value: '3x3', label: '三阶', short: '3×3', color: '#F2A024' },
+  { value: '4x4', label: '四阶', short: '4×4', color: '#34B4E2' },
+  { value: '5x5', label: '五阶', short: '5×5', color: '#9B6FE0' },
+  { value: 'pyraminx', label: '金字塔', short: 'PYRA', color: '#93BC37' },
+  { value: 'skewb', label: '斜转', short: 'SKEWB', color: '#E8709A' },
 ]
 
-export function weekdayLabel(v) {
-  return WEEKDAYS.find((d) => Number(d.value) === Number(v))?.label || '—'
+export function cubeProjectMeta(value) {
+  return CUBE_PROJECTS.find((p) => p.value === value) || null
 }
 
 /** 课程难度 1-5 */
@@ -130,5 +114,3 @@ export const TRACK_OPTIONS = TRACKS.map((t) => ({ value: t.value, label: t.label
 export function trackMeta(value) {
   return TRACKS.find((t) => t.value === value) || null
 }
-
-export const STUDENT_LEVEL_OPTIONS = ['新手', '入门', '熟练', '竞速']

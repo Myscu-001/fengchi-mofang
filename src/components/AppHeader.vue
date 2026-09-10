@@ -157,14 +157,12 @@ import {
   Boxes,
   ChevronDown,
   FolderOpen,
-  GraduationCap,
   LayoutDashboard,
   LogIn,
   LogOut,
   Menu,
   Settings,
   ShieldCheck,
-  Trophy,
   UserCog,
   Users,
   X,
@@ -195,8 +193,6 @@ const navDefs = [
   { to: { name: 'home' }, label: '首页', icon: LayoutDashboard },
   { to: { name: 'courses' }, label: '课程体系', icon: Boxes, perm: 'course.view' },
   { to: { name: 'students' }, label: '学员档案', icon: Users, perm: 'student.view' },
-  { to: { name: 'classes' }, label: '开班管理', icon: GraduationCap, perm: 'class.view' },
-  { to: { name: 'grades' }, label: '测评成绩', icon: Trophy, perm: 'grade.view' },
   { to: { name: 'resources' }, label: '资源中心', icon: FolderOpen, perm: 'resource.view' },
 ]
 

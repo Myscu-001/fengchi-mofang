@@ -8,8 +8,8 @@
 -- -----------------------------------------------------------------------------
 insert into public.roles (code, name, description, level, is_system) values
   ('admin',     '超级管理员', '拥有全部权限，可管理账号、角色与站点配置', 100, true),
-  ('teacher',   '机构老师',   '日常教学管理：课程、学员、班级、成绩、资源',  50, true),
-  ('assistant', '助教',       '辅助教学：查看课程学员、录入成绩、上传资源',  20, true)
+  ('teacher',   '机构老师',   '日常教学管理：课程、学员、魔方成绩、资源',  50, true),
+  ('assistant', '助教',       '辅助教学：查看课程学员、录入魔方成绩、上传资源',  20, true)
 on conflict (code) do nothing;
 
 -- -----------------------------------------------------------------------------
@@ -24,10 +24,8 @@ insert into public.permissions (code, name, module, description, sort_order) val
   ('course.manage',   '编辑课程',     'course',   '新建、修改、上下架课程与课时',         110),
   ('student.view',    '查看学员',     'student',  '浏览学员档案',                         200),
   ('student.manage',  '编辑学员',     'student',  '新建、修改学员档案与状态',             210),
-  ('class.view',      '查看班级',     'class',    '浏览开班与班级名单',                   300),
-  ('class.manage',    '编辑班级',     'class',    '新建班级、调整排课与成员',             310),
-  ('grade.view',      '查看成绩',     'grade',    '浏览测评与成绩记录',                   400),
-  ('grade.manage',    '录入成绩',     'grade',    '创建测评、录入与修改成绩',             410),
+  ('score.view',      '查看成绩',     'score',    '浏览学员的魔方成绩记录',               400),
+  ('score.manage',    '录入成绩',     'score',    '新增、修改、删除魔方成绩记录',         410),
   ('resource.view',   '查看资源',     'resource', '浏览与下载教学资源',                   500),
   ('resource.manage', '管理资源',     'resource', '上传、编辑、删除资源与分类',           510)
 on conflict (code) do nothing;
@@ -46,10 +44,8 @@ insert into public.role_permissions (role_code, permission_code) values
   ('teacher', 'course.manage'),
   ('teacher', 'student.view'),
   ('teacher', 'student.manage'),
-  ('teacher', 'class.view'),
-  ('teacher', 'class.manage'),
-  ('teacher', 'grade.view'),
-  ('teacher', 'grade.manage'),
+  ('teacher', 'score.view'),
+  ('teacher', 'score.manage'),
   ('teacher', 'resource.view'),
   ('teacher', 'resource.manage')
 on conflict do nothing;
@@ -58,9 +54,8 @@ on conflict do nothing;
 insert into public.role_permissions (role_code, permission_code) values
   ('assistant', 'course.view'),
   ('assistant', 'student.view'),
-  ('assistant', 'class.view'),
-  ('assistant', 'grade.view'),
-  ('assistant', 'grade.manage'),
+  ('assistant', 'score.view'),
+  ('assistant', 'score.manage'),
   ('assistant', 'resource.view'),
   ('assistant', 'resource.manage')
 on conflict do nothing;

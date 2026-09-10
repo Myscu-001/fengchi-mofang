@@ -36,9 +36,6 @@
         <span class="inline-flex items-center gap-1">
           <BookOpen class="size-3.5 text-ink-400" />{{ course.lesson_count ?? course.total_lessons ?? 0 }} 课时
         </span>
-        <span class="inline-flex items-center gap-1">
-          <Users class="size-3.5 text-ink-400" />{{ course.student_count ?? 0 }} 名学员
-        </span>
         <span v-if="course.age_range" class="inline-flex items-center gap-1">
           <Baby class="size-3.5 text-ink-400" />{{ course.age_range }}
         </span>
@@ -65,7 +62,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Baby, BookOpen, ChevronRight, LayoutGrid, Users } from 'lucide-vue-next'
+import { Baby, BookOpen, ChevronRight, LayoutGrid } from 'lucide-vue-next'
 import UiBadge from '@/components/UiBadge.vue'
 import { COURSE_STATUS, levelLabel } from '@/lib/dict'
 
