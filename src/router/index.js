@@ -42,6 +42,12 @@ const routes = [
         meta: { title: '资源中心', requiresAuth: true, permission: 'resource.view' },
       },
       {
+        path: 'analytics',
+        name: 'analytics',
+        component: () => import('@/views/AnalyticsView.vue'),
+        meta: { title: '统计分析', requiresAuth: true, permission: 'score.view' },
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/ProfileView.vue'),
