@@ -6,11 +6,14 @@ function clean(kw) {
     .trim()
 }
 
+// 注意：classes 表有两个指向 profiles 的外键（teacher_id 与 created_by），
+// PostgREST 无法自动判断用哪一个，必须用「!外键约束名」显式指定，
+// 否则会报 "more than one relationship was found for 'classes' and 'profiles'"。
 const CLASS_SELECT = `
   id, name, room, weekday, start_time, end_time, start_date, end_date,
   capacity, status, notes, created_at,
   course:courses(id, title, category),
-  teacher:profiles(id, full_name, role_code),
+  teacher:profiles!classes_teacher_id_fkey(id, full_name, role_code),
   members:class_members(count)
 `
 
