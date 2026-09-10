@@ -111,7 +111,8 @@
               <div
                 v-for="res in resources"
                 :key="res.id"
-                class="fc-card group flex flex-col p-4 transition hover:shadow-lift"
+                class="fc-card group flex cursor-pointer flex-col p-4 transition hover:shadow-lift"
+                @click="openPreview(res)"
               >
                 <div class="flex items-start gap-3">
                   <ResourceIcon :kind="res.file_type" />
@@ -127,14 +128,14 @@
                     <button
                       class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
                       title="编辑"
-                      @click="openEdit(res)"
+                      @click.stop="openEdit(res)"
                     >
                       <Pencil class="size-3.5" />
                     </button>
                     <button
                       class="rounded-lg p-1.5 text-ink-400 transition hover:bg-red-50 hover:text-red-500"
                       title="删除"
-                      @click="remove(res)"
+                      @click.stop="remove(res)"
                     >
                       <Trash2 class="size-3.5" />
                     </button>
@@ -169,23 +170,23 @@
 
                 <div class="mt-auto flex items-center gap-2 border-t border-ink-100 pt-3">
                   <UiButton
+                    variant="outline"
+                    size="sm"
+                    title="预览"
+                    @click.stop="openPreview(res)"
+                  >
+                    <template #icon><Eye class="size-3.5" /></template>
+                    预览
+                  </UiButton>
+                  <UiButton
                     variant="primary"
                     size="sm"
                     block
                     :loading="downloadingId === res.id"
-                    @click="download(res)"
+                    @click.stop="download(res)"
                   >
                     <template #icon><Download class="size-3.5" /></template>
                     下载
-                  </UiButton>
-                  <UiButton
-                    v-if="canPreview(res)"
-                    variant="outline"
-                    size="sm"
-                    title="新窗口预览"
-                    @click="preview(res)"
-                  >
-                    <template #icon><ExternalLink class="size-3.5" /></template>
                   </UiButton>
                 </div>
               </div>
@@ -341,6 +342,69 @@
         <UiButton variant="primary" @click="categoryOpen = false">完成</UiButton>
       </template>
     </UiModal>
+
+    <!-- 在线预览 -->
+    <UiModal
+      :open="previewOpen"
+      :title="previewing?.title"
+      :subtitle="previewing?.file_name"
+      width="xl"
+      @close="previewOpen = false"
+    >
+      <div v-if="previewLoading" class="py-12">
+        <UiLoading text="正在准备预览…" />
+      </div>
+      <div v-else-if="previewing" class="min-h-[200px]">
+        <img
+          v-if="previewKind === 'image'"
+          :src="previewSrc"
+          class="mx-auto max-h-[70vh] rounded-lg object-contain"
+          alt="预览"
+        />
+        <iframe
+          v-else-if="previewKind === 'pdf'"
+          :src="previewSrc"
+          class="h-[70vh] w-full rounded-lg border border-ink-200 bg-white"
+          title="PDF 预览"
+        />
+        <div v-else-if="previewKind === 'video'" class="flex justify-center">
+          <video :src="previewSrc" controls class="max-h-[70vh] w-full rounded-lg bg-black" />
+        </div>
+        <div v-else-if="previewKind === 'audio'" class="py-10">
+          <audio :src="previewSrc" controls class="mx-auto w-full" />
+        </div>
+        <pre
+          v-else-if="previewKind === 'text'"
+          class="max-h-[70vh] overflow-auto rounded-lg bg-ink-50 p-4 text-[12.5px] leading-relaxed text-ink-700"
+        >{{ previewText }}</pre>
+        <div v-else class="py-12 text-center">
+          <p class="text-[13.5px] text-ink-500">
+            此文件类型（{{ previewLabel }}）暂不支持在线预览，请在下方下载，或点击「新窗口打开」由浏览器尝试查看。
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <UiButton variant="outline" @click="previewOpen = false">关闭</UiButton>
+        <UiButton
+          v-if="previewSrc && previewKind !== 'text'"
+          variant="secondary"
+          @click="openRaw"
+        >
+          <template #icon><ExternalLink class="size-3.5" /></template>
+          新窗口打开
+        </UiButton>
+        <UiButton
+          v-if="previewing"
+          variant="primary"
+          :loading="downloadingId === previewing.id"
+          @click="download(previewing)"
+        >
+          <template #icon><Download class="size-3.5" /></template>
+          下载
+        </UiButton>
+      </template>
+    </UiModal>
   </div>
 </template>
 
@@ -351,6 +415,7 @@ import {
   Check,
   Download,
   ExternalLink,
+  Eye,
   FileCheck,
   FolderCog,
   FolderOpen,
@@ -429,6 +494,26 @@ const catSaving = ref(null)
 
 const courseOptions = ref([])
 
+// 在线预览
+const previewOpen = ref(false)
+const previewing = ref(null)
+const previewLoading = ref(false)
+const previewKind = ref('other')
+const previewSrc = ref('')
+const previewText = ref('')
+
+const KIND_LABEL = {
+  pdf: 'PDF',
+  image: '图片',
+  video: '音视频',
+  document: '文档',
+  sheet: '表格',
+  slide: '演示文稿',
+  archive: '压缩包',
+  other: '文件',
+}
+const previewLabel = computed(() => KIND_LABEL[previewing.value?.file_type] || '文件')
+
 const form = reactive({
   title: '',
   description: '',
@@ -496,10 +581,6 @@ function resetFilters() {
 function setCategory(id) {
   filters.categoryId = id
   applyFilters()
-}
-
-function canPreview(res) {
-  return ['pdf', 'image'].includes(res.file_type)
 }
 
 function openUpload() {
@@ -626,13 +707,47 @@ async function download(res) {
   }
 }
 
-async function preview(res) {
+function fileExt(name = '') {
+  return (name.split('.').pop() || '').toLowerCase()
+}
+
+const AUDIO_EXTS = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac']
+const TEXT_EXTS = ['txt', 'md']
+
+async function openPreview(res) {
+  previewing.value = res
+  previewOpen.value = true
+  previewLoading.value = true
+  previewKind.value = 'other'
+  previewSrc.value = ''
+  previewText.value = ''
+  const ext = fileExt(res.file_name)
   try {
-    const url = await previewUrl(res)
-    window.open(url, '_blank', 'noopener')
+    const kind = res.file_type
+    // 音频文件在 detectFileKind 里被归入 video，这里单独识别
+    if (kind === 'image' || kind === 'pdf' || kind === 'video' || AUDIO_EXTS.includes(ext)) {
+      previewKind.value = AUDIO_EXTS.includes(ext) ? 'audio' : kind
+      previewSrc.value = await previewUrl(res)
+    } else if (kind === 'document' && TEXT_EXTS.includes(ext)) {
+      previewKind.value = 'text'
+      const url = await previewUrl(res)
+      const resp = await fetch(url)
+      previewText.value = await resp.text()
+    } else {
+      // 不支持内联预览的类型：仍生成链接，供「新窗口打开」兜底
+      previewKind.value = 'other'
+      previewSrc.value = await previewUrl(res)
+    }
   } catch (err) {
     toast.error(err.message)
+    previewKind.value = 'other'
+  } finally {
+    previewLoading.value = false
   }
+}
+
+function openRaw() {
+  if (previewSrc.value) window.open(previewSrc.value, '_blank', 'noopener')
 }
 
 // ---------------------------------------------------------------------------
