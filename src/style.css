@@ -1,0 +1,194 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   风驰思维魔方 · 设计令牌
+   品牌主色取自魔方蓝，辅以魔方六面标准色作为语义色
+   ============================================================ */
+@theme {
+  --font-sans:
+    'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC', system-ui,
+    -apple-system, 'Segoe UI', sans-serif;
+
+  /* 品牌蓝 */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7ff;
+  --color-brand-200: #bdd2ff;
+  --color-brand-300: #93b4ff;
+  --color-brand-400: #628cff;
+  --color-brand-500: #3366ff;
+  --color-brand-600: #1f47f5;
+  --color-brand-700: #1836dd;
+  --color-brand-800: #1a2fb0;
+  --color-brand-900: #1c2f8b;
+  --color-brand-950: #151d54;
+
+  /* 魔方六色 */
+  --color-cube-red: #ef4444;
+  --color-cube-orange: #f97316;
+  --color-cube-yellow: #facc15;
+  --color-cube-green: #22c55e;
+  --color-cube-blue: #3b82f6;
+  --color-cube-white: #f8fafc;
+
+  /* 中性色（浅色主题） */
+  --color-ink-50: #f7f9fc;
+  --color-ink-100: #eef2f7;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+
+  --radius-card: 16px;
+  --radius-field: 10px;
+
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -6px rgb(15 23 42 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 40px -12px rgb(15 23 42 / 0.16);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-ink-50);
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--color-ink-900);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  ::selection {
+    background: var(--color-brand-100);
+    color: var(--color-brand-800);
+  }
+
+  /* 细滚动条 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-ink-300);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-400);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* 页面容器 */
+  .fc-container {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: 20px;
+  }
+
+  /* 卡片 */
+  .fc-card {
+    background: #fff;
+    border: 1px solid var(--color-ink-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* 输入框 */
+  .fc-input {
+    width: 100%;
+    border: 1px solid var(--color-ink-200);
+    border-radius: var(--radius-field);
+    background: #fff;
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--color-ink-800);
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .fc-input::placeholder {
+    color: var(--color-ink-400);
+  }
+  .fc-input:focus {
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 3px rgb(51 102 255 / 0.14);
+  }
+  .fc-input:disabled {
+    background: var(--color-ink-100);
+    color: var(--color-ink-400);
+    cursor: not-allowed;
+  }
+  select.fc-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 34px;
+  }
+  textarea.fc-input {
+    resize: vertical;
+    min-height: 96px;
+  }
+
+  /* 魔方渐变背景 */
+  .fc-cube-bg {
+    background-image:
+      radial-gradient(circle at 12% 18%, rgb(239 68 68 / 0.1), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgb(250 204 21 / 0.14), transparent 40%),
+      radial-gradient(circle at 78% 88%, rgb(34 197 94 / 0.12), transparent 42%),
+      radial-gradient(circle at 18% 86%, rgb(51 102 255 / 0.14), transparent 44%);
+  }
+}
+
+@layer utilities {
+  .fc-scroll-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .fc-anim-in {
+    animation: fc-fade-up 0.4s ease both;
+  }
+}
+
+@keyframes fc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fc-spin {
+  animation: fc-spin 0.9s linear infinite;
+}
