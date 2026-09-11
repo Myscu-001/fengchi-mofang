@@ -167,6 +167,7 @@ import {
   UserCog,
   Users,
   X,
+  Trophy,
 } from 'lucide-vue-next'
 import LogoMark from '@/components/LogoMark.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
@@ -195,6 +196,7 @@ const navDefs = [
   { to: { name: 'courses' }, label: '课程体系', icon: Boxes, perm: 'course.view' },
   { to: { name: 'students' }, label: '学员档案', icon: Users, perm: 'student.view' },
   { to: { name: 'analytics' }, label: '统计分析', icon: BarChart3, perm: 'score.view' },
+  { to: { name: 'honor' }, label: 'PB 荣誉墙', icon: Trophy, perm: 'score.view' },
   { to: { name: 'resources' }, label: '资源中心', icon: FolderOpen, perm: 'resource.view' },
 ]
 

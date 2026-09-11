@@ -75,6 +75,7 @@ export async function listResources(params = {}) {
     categoryId = '',
     courseId = '',
     fileType = '',
+    tag = '',
     sort = 'newest',
     page = 1,
     pageSize = 24,
@@ -83,10 +84,16 @@ export async function listResources(params = {}) {
   let query = supabase.from(TABLES.resources).select(RESOURCE_SELECT, { count: 'exact' })
 
   const kw = clean(keyword)
-  if (kw) query = query.or(`title.ilike.%${kw}%,file_name.ilike.%${kw}%,description.ilike.%${kw}%`)
+  if (kw) {
+    // 关键词同时匹配标题 / 文件名 / 描述 / 标签（含项目标签）
+    query = query.or(
+      `title.ilike.%${kw}%,file_name.ilike.%${kw}%,description.ilike.%${kw}%,tags.cs.{${kw}}`,
+    )
+  }
   if (categoryId) query = query.eq('category_id', categoryId)
   if (courseId) query = query.eq('course_id', courseId)
   if (fileType) query = query.eq('file_type', fileType)
+  if (tag) query = query.contains('tags', [tag])
 
   if (sort === 'popular') {
     query = query.order('download_count', { ascending: false })
@@ -104,6 +111,37 @@ export async function listResources(params = {}) {
   const { data, error, count } = await query
   if (error) throw new Error(errorMessage(error, '加载资源列表失败'))
   return { items: data || [], total: count ?? 0 }
+}
+
+/**
+ * 标签统计：汇总全库资源的标签及使用次数。
+ * 项目标签（值等于魔方项目枚举）由调用方识别区分。
+ */
+export async function listTagStats() {
+  const { data, error } = await supabase.from(TABLES.resources).select('tags')
+  if (error) throw new Error(errorMessage(error, '加载标签失败'))
+  const map = {}
+  for (const row of data || []) {
+    for (const t of row.tags || []) {
+      const key = String(t || '').trim()
+      if (!key) continue
+      map[key] = (map[key] || 0) + 1
+    }
+  }
+  return map
+}
+
+/** 按标签（常用于「适用魔方项目」）取资源，供学员子页展示相关教学资源 */
+export async function listResourcesByTag(tag, limit = 6) {
+  if (!tag) return []
+  const { data, error } = await supabase
+    .from(TABLES.resources)
+    .select(RESOURCE_SELECT)
+    .contains('tags', [tag])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(errorMessage(error, '加载相关资源失败'))
+  return data || []
 }
 
 export async function getResource(id) {

@@ -48,6 +48,12 @@ const routes = [
         meta: { title: '统计分析', requiresAuth: true, permission: 'score.view' },
       },
       {
+        path: 'honor',
+        name: 'honor',
+        component: () => import('@/views/HonorWallView.vue'),
+        meta: { title: 'PB 荣誉墙', requiresAuth: true, permission: 'score.view' },
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/ProfileView.vue'),

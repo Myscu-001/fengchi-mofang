@@ -286,6 +286,39 @@
         </div>
         <p v-else class="py-8 text-center text-[13px] text-ink-400">该日期范围内无成绩数据</p>
       </div>
+
+      <!-- 相关教学资源 -->
+      <div v-if="canViewResources" class="fc-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-900">
+            <FolderOpen class="size-4 text-brand-500" />相关教学资源
+            <span class="ml-1 text-[12px] font-normal text-ink-400">{{ cubeMeta?.label }}</span>
+          </h3>
+          <RouterLink
+            :to="{ name: 'resources', query: { project } }"
+            class="text-[12.5px] text-brand-600 hover:underline"
+          >
+            查看全部
+          </RouterLink>
+        </div>
+        <UiLoading v-if="relatedLoading" text="加载相关资源…" />
+        <div v-else-if="relatedResources.length" class="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div
+            v-for="res in relatedResources"
+            :key="res.id"
+            class="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 transition hover:border-brand-200 hover:bg-brand-50/40"
+          >
+            <ResourceIcon :kind="res.file_type" />
+            <div class="min-w-0 flex-1">
+              <p class="line-clamp-1 text-[13px] font-medium text-ink-800" :title="res.title">{{ res.title }}</p>
+              <p class="mt-0.5 line-clamp-1 text-[11.5px] text-ink-400" :title="res.file_name">{{ res.file_name }}</p>
+            </div>
+          </div>
+        </div>
+        <p v-else class="mt-2 py-4 text-center text-[12.5px] text-ink-400">
+          暂无「{{ cubeMeta?.label }}」相关教学资源，可在资源中心上传时绑定该魔方项目。
+        </p>
+      </div>
     </div>
 
     <!-- 新增 / 编辑成绩 -->
@@ -446,6 +479,7 @@ import {
   ArrowLeft,
   CalendarClock,
   Download,
+  FolderOpen,
   ListChecks,
   Medal,
   Pencil,
@@ -467,6 +501,7 @@ import UiStat from '@/components/UiStat.vue'
 import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiPagination from '@/components/UiPagination.vue'
+import ResourceIcon from '@/components/ResourceIcon.vue'
 import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
 import { rankForProject, nextRank, rankTiers } from '@/lib/ranks'
 import { formatDate } from '@/lib/format'
@@ -482,6 +517,7 @@ import {
   buildScoreCsv,
   computeAo5,
 } from '@/api/scores'
+import { listResourcesByTag } from '@/api/resources'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
@@ -504,6 +540,10 @@ const stats = reactive({ count: 0, bestAvg: null, bestSingle: null, lastRecorded
 const page = ref(1)
 const pageSize = ref(10)
 const bulkDeleted = ref([])
+const relatedResources = ref([])
+const relatedLoading = ref(false)
+
+const canViewResources = computed(() => auth.can('resource.view'))
 
 const cubeMeta = computed(() => CUBE_PROJECTS.find((p) => p.value === project.value) || null)
 const today = new Date().toISOString().slice(0, 10)
@@ -957,6 +997,7 @@ async function loadProject() {
     scores.value = list.items
     Object.assign(stats, st)
     if (page.value > totalPages.value) page.value = totalPages.value
+    loadRelated()
   } catch (err) {
     toast.error(err.message)
     scores.value = []
@@ -991,6 +1032,22 @@ async function loadBests() {
     bests.value = await studentProjectBests({ studentId: student.value.id })
   } catch {
     bests.value = {}
+  }
+}
+
+/** 加载与当前魔方项目关联的教学资源（资源以项目枚举值作为标签存储） */
+async function loadRelated() {
+  if (!auth.can('resource.view') || !project.value) {
+    relatedResources.value = []
+    return
+  }
+  relatedLoading.value = true
+  try {
+    relatedResources.value = await listResourcesByTag(project.value, 6)
+  } catch {
+    relatedResources.value = []
+  } finally {
+    relatedLoading.value = false
   }
 }
 

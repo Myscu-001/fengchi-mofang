@@ -88,6 +88,10 @@
                 @keyup.enter="applyFilters"
               />
             </div>
+            <select v-model="filters.project" class="fc-input w-auto min-w-[118px]" @change="onProjectChange">
+              <option value="">全部项目</option>
+              <option v-for="p in CUBE_PROJECTS" :key="p.value" :value="p.value">{{ p.label }}</option>
+            </select>
             <select v-model="filters.fileType" class="fc-input w-auto min-w-[120px]" @change="applyFilters">
               <option value="">全部类型</option>
               <option v-for="o in FILE_KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
@@ -102,6 +106,23 @@
               <template #icon><RotateCcw class="size-3.5" /></template>
               重置
             </UiButton>
+          </div>
+
+          <div v-if="allTags.length" class="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span class="text-[12px] text-ink-400">标签：</span>
+            <button
+              v-for="t in allTags"
+              :key="t.name"
+              type="button"
+              class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition"
+              :class="filters.tag === t.name
+                ? 'border-brand-300 bg-brand-50 font-medium text-brand-700'
+                : 'border-ink-200 bg-white text-ink-600 hover:bg-ink-50'"
+              @click="toggleTag(t.name)"
+            >
+              {{ t.name }}
+              <span class="text-ink-400 tabular-nums">{{ t.count }}</span>
+            </button>
           </div>
 
           <div v-if="loading" class="fc-card mt-4"><UiLoading text="正在加载资源…" /></div>
@@ -148,6 +169,13 @@
 
                 <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
                   <UiBadge
+                    v-for="vp in projectTags(res)"
+                    :key="vp.value"
+                    :label="vp.label"
+                    custom-class="border-transparent text-white"
+                    :style="{ backgroundColor: vp.color }"
+                  />
+                  <UiBadge
                     v-if="res.category"
                     :label="res.category.name"
                     :custom-class="'border-transparent'"
@@ -158,6 +186,11 @@
                     :label="res.version"
                     custom-class="bg-ink-100 text-ink-600 border-ink-200"
                   />
+                  <span
+                    v-for="t in freeTags(res)"
+                    :key="t"
+                    class="rounded-md bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-500"
+                  >#{{ t }}</span>
                 </div>
 
                 <div class="mt-2.5 flex items-center gap-3 text-[11.5px] text-ink-400">
@@ -296,6 +329,29 @@
             </select>
           </UiField>
           <div class="sm:col-span-2">
+            <UiField label="适用魔方项目" hint="可多选；绑定后学员档案中会展示相关教学资源">
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="p in CUBE_PROJECTS"
+                  :key="p.value"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12.5px] transition"
+                  :class="form.projects.includes(p.value)
+                    ? 'border-transparent font-medium text-white'
+                    : 'border-ink-200 bg-white text-ink-600 hover:bg-ink-50'"
+                  :style="form.projects.includes(p.value) ? { backgroundColor: p.color } : {}"
+                  @click="toggleProject(p.value)"
+                >
+                  <span
+                    class="size-2 rounded-sm"
+                    :style="{ backgroundColor: form.projects.includes(p.value) ? 'rgba(255,255,255,.85)' : p.color }"
+                  />
+                  {{ p.label }}
+                </button>
+              </div>
+            </UiField>
+          </div>
+          <div class="sm:col-span-2">
             <UiField label="标签" hint="多个标签用逗号分隔">
               <input v-model="tagsInput" class="fc-input" placeholder="层先法, 图示, 入门" />
             </UiField>
@@ -410,7 +466,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   Check,
   Download,
@@ -445,6 +501,7 @@ import {
   updateCategory,
   deleteCategory,
   listResources,
+  listTagStats,
   uploadResource,
   updateResource,
   deleteResource,
@@ -453,7 +510,14 @@ import {
   topResources,
 } from '@/api/resources'
 import { listCourseOptions } from '@/api/courses'
-import { FILE_KIND_OPTIONS, MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from '@/lib/dict'
+import {
+  CUBE_PROJECTS,
+  cubeProjectMeta,
+  FILE_KIND_OPTIONS,
+  isCubeProject,
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_LABEL,
+} from '@/lib/dict'
 import { formatDate, formatFileSize } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -462,6 +526,7 @@ import { useDialogStore } from '@/stores/dialog'
 const auth = useAuthStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
+const route = useRoute()
 
 const canManage = computed(() => auth.can('resource.manage'))
 
@@ -476,7 +541,23 @@ const pageSize = 12
 const loading = ref(true)
 const downloadingId = ref(null)
 
-const filters = reactive({ keyword: '', categoryId: '', fileType: '', sort: 'newest' })
+const filters = reactive({ keyword: '', categoryId: '', fileType: '', project: '', tag: '', sort: 'newest' })
+const tagStats = ref({})
+
+/** 普通标签（排除「适用魔方项目」标签），按使用次数倒序 */
+const allTags = computed(() =>
+  Object.entries(tagStats.value)
+    .filter(([name]) => !isCubeProject(name))
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh')),
+)
+
+function projectTags(res) {
+  return (res.tags || []).filter(isCubeProject).map((v) => cubeProjectMeta(v)).filter(Boolean)
+}
+function freeTags(res) {
+  return (res.tags || []).filter((t) => !isCubeProject(t))
+}
 
 const formOpen = ref(false)
 const editing = ref(null)
@@ -521,6 +602,7 @@ const form = reactive({
   course_id: '',
   version: '',
   visibility: 'internal',
+  projects: [],
 })
 
 async function loadCategories() {
@@ -537,7 +619,13 @@ async function loadCategories() {
 async function loadResources() {
   loading.value = true
   try {
-    const { items, total: count } = await listResources({ ...filters, page: page.value, pageSize })
+    // 项目筛选与标签筛选共用 tag 参数（项目以项目枚举值作为标签存储）
+    const { items, total: count } = await listResources({
+      ...filters,
+      tag: filters.tag || filters.project,
+      page: page.value,
+      pageSize,
+    })
     resources.value = items
     total.value = count
   } catch (err) {
@@ -546,6 +634,14 @@ async function loadResources() {
     total.value = 0
   } finally {
     loading.value = false
+  }
+}
+
+async function loadTagStats() {
+  try {
+    tagStats.value = await listTagStats()
+  } catch {
+    // 忽略标签统计失败，不影响主列表
   }
 }
 
@@ -574,6 +670,8 @@ function resetFilters() {
   filters.keyword = ''
   filters.categoryId = ''
   filters.fileType = ''
+  filters.project = ''
+  filters.tag = ''
   filters.sort = 'newest'
   applyFilters()
 }
@@ -581,6 +679,24 @@ function resetFilters() {
 function setCategory(id) {
   filters.categoryId = id
   applyFilters()
+}
+
+/** 项目与标签互斥（都映射到 tags 过滤） */
+function onProjectChange() {
+  if (filters.project) filters.tag = ''
+  applyFilters()
+}
+
+function toggleTag(name) {
+  filters.tag = filters.tag === name ? '' : name
+  if (filters.tag) filters.project = ''
+  applyFilters()
+}
+
+function toggleProject(value) {
+  const idx = form.projects.indexOf(value)
+  if (idx >= 0) form.projects.splice(idx, 1)
+  else form.projects.push(value)
 }
 
 function openUpload() {
@@ -596,6 +712,7 @@ function openUpload() {
     course_id: '',
     version: '',
     visibility: 'internal',
+    projects: [],
   })
   formOpen.value = true
 }
@@ -605,7 +722,9 @@ function openEdit(res) {
   formError.value = ''
   selectedFile.value = null
   progress.value = 0
-  tagsInput.value = (res.tags || []).join(', ')
+  const tags = res.tags || []
+  const projects = tags.filter(isCubeProject)
+  tagsInput.value = tags.filter((t) => !isCubeProject(t)).join(', ')
   Object.assign(form, {
     title: res.title,
     description: res.description || '',
@@ -613,6 +732,7 @@ function openEdit(res) {
     course_id: res.course_id || '',
     version: res.version || '',
     visibility: res.visibility || 'internal',
+    projects: [...projects],
   })
   formOpen.value = true
 }
@@ -649,10 +769,14 @@ async function submit() {
     course_id: form.course_id || null,
     version: form.version?.trim() || null,
     visibility: form.visibility,
-    tags: tagsInput.value
-      .split(/[,，]/)
-      .map((s) => s.trim())
-      .filter(Boolean),
+    // 项目标签 + 普通标签合并去重（项目以项目枚举值作为标签存储）
+    tags: [
+      ...form.projects,
+      ...tagsInput.value
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter((t) => t && !isCubeProject(t)),
+    ].filter((v, i, arr) => arr.indexOf(v) === i),
   }
 
   saving.value = true
@@ -668,7 +792,7 @@ async function submit() {
       toast.success('资源上传成功')
     }
     formOpen.value = false
-    await Promise.all([loadResources(), loadCategories(), loadTop()])
+    await Promise.all([loadResources(), loadCategories(), loadTop(), loadTagStats()])
   } catch (err) {
     formError.value = err.message
   } finally {
@@ -687,7 +811,7 @@ async function remove(res) {
   try {
     await deleteResource(res)
     toast.success('资源已删除')
-    await Promise.all([loadResources(), loadCategories(), loadTop()])
+    await Promise.all([loadResources(), loadCategories(), loadTop(), loadTagStats()])
   } catch (err) {
     toast.error(err.message)
   }
@@ -812,9 +936,13 @@ async function removeCategory(cat) {
 watch(page, loadResources)
 
 onMounted(() => {
+  // 支持从学员档案「查看全部」带项目参数进入
+  const qp = route.query.project
+  if (qp && CUBE_PROJECTS.some((p) => p.value === qp)) filters.project = qp
   loadCategories()
   loadResources()
   loadTop()
   loadOptions()
+  loadTagStats()
 })
 </script>

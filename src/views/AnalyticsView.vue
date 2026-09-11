@@ -8,9 +8,29 @@
     </PageHeader>
 
     <div class="fc-container space-y-5 py-7">
+      <!-- 视图切换 -->
+      <div class="flex w-fit rounded-lg bg-ink-100 p-0.5">
+        <button
+          type="button"
+          class="rounded-md px-4 py-1.5 text-[13px] font-medium transition"
+          :class="viewMode === 'single' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+          @click="viewMode = 'single'"
+        >
+          单项目分析
+        </button>
+        <button
+          type="button"
+          class="rounded-md px-4 py-1.5 text-[13px] font-medium transition"
+          :class="viewMode === 'matrix' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+          @click="viewMode = 'matrix'"
+        >
+          跨项目总览
+        </button>
+      </div>
+
       <!-- 筛选条 -->
       <div class="fc-card flex flex-wrap items-end gap-4 p-4">
-        <div>
+        <div v-if="viewMode === 'single'">
           <label class="mb-1.5 block text-[12px] font-medium text-ink-500">魔方项目</label>
           <select v-model="project" class="fc-input w-auto min-w-[130px]">
             <option v-for="p in CUBE_PROJECTS" :key="p.value" :value="p.value">{{ p.label }}</option>
@@ -32,7 +52,7 @@
           </select>
         </div>
         <div class="ml-auto text-right text-[12.5px] text-ink-400">
-          <div>共 <span class="font-semibold text-ink-600">{{ scores.length }}</span> 条成绩</div>
+          <div>共 <span class="font-semibold text-ink-600">{{ viewMode === 'single' ? scores.length : allScores.length }}</span> 条成绩</div>
           <div>覆盖 <span class="font-semibold text-ink-600">{{ rankedCount }}</span> / {{ filteredStudents.length }} 名学员</div>
         </div>
       </div>
@@ -41,6 +61,85 @@
       </p>
 
       <UiLoading v-if="loading" text="正在计算统计数据…" />
+
+      <!-- 跨项目总览：热力矩阵 -->
+      <template v-else-if="viewMode === 'matrix'">
+        <section class="fc-card overflow-hidden">
+          <div class="flex flex-wrap items-center gap-3 border-b border-ink-200 px-4 py-3">
+            <h3 class="text-[14px] font-semibold text-ink-800">跨项目成绩矩阵</h3>
+            <div class="flex rounded-lg bg-ink-100 p-0.5">
+              <button
+                type="button"
+                class="rounded-md px-3 py-1.5 text-[12.5px] font-medium transition"
+                :class="rankMetric === 'avg' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+                @click="rankMetric = 'avg'"
+              >
+                最佳平均
+              </button>
+              <button
+                type="button"
+                class="rounded-md px-3 py-1.5 text-[12.5px] font-medium transition"
+                :class="rankMetric === 'single' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+                @click="rankMetric = 'single'"
+              >
+                最佳单次
+              </button>
+            </div>
+            <span class="ml-auto text-[12px] text-ink-400">颜色代表段位，越靠下颜色越「高级」；「—」表示暂无该项目成绩</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[760px] text-left text-[13px]">
+              <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
+                <tr>
+                  <th class="sticky left-0 z-10 bg-ink-50 px-4 py-3 font-medium">学员</th>
+                  <th
+                    v-for="p in CUBE_PROJECTS"
+                    :key="p.value"
+                    class="px-2 py-3 text-center font-medium"
+                  >
+                    <span class="inline-flex items-center gap-1">
+                      <span class="size-2 rounded-sm" :style="{ backgroundColor: p.color }" />
+                      {{ p.label }}
+                    </span>
+                  </th>
+                  <th class="px-3 py-3 text-center font-medium">覆盖</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-ink-100">
+                <tr v-for="row in matrix" :key="row.student.id" class="transition hover:bg-ink-50/60">
+                  <td class="sticky left-0 z-10 bg-white px-4 py-2.5">
+                    <button
+                      type="button"
+                      class="flex items-center gap-2.5 text-left"
+                      @click="goStudent(row.student.id)"
+                    >
+                      <UiAvatar :src="row.student.avatar_url" :name="row.student.name" size="xs" />
+                      <span class="font-medium text-ink-800 hover:text-brand-700">{{ row.student.name }}</span>
+                    </button>
+                  </td>
+                  <td v-for="cell in row.cells" :key="cell.project" class="px-1.5 py-2">
+                    <div
+                      v-if="cell.value != null"
+                      class="flex min-w-[56px] flex-col items-center rounded-lg px-2 py-1.5"
+                      :style="cell.rank
+                        ? { backgroundColor: cell.rank.color + '20', color: cell.rank.color }
+                        : { backgroundColor: '#F1F3F5', color: '#8A9199' }"
+                      :title="`${cubeLabel(cell.project)} · ${fmtSec(cell.value)}${cell.rank ? ' · ' + cell.rank.label : ''}`"
+                    >
+                      <span class="text-[13px] font-semibold tabular-nums">{{ fmtSecShort(cell.value) }}</span>
+                      <span v-if="cell.rank" class="text-[10px] font-medium">{{ cell.rank.label }}</span>
+                      <span v-else class="text-[10px] opacity-70">未达标</span>
+                    </div>
+                    <div v-else class="flex min-w-[56px] items-center justify-center rounded-lg bg-ink-50 px-2 py-1.5 text-[13px] text-ink-300">—</div>
+                  </td>
+                  <td class="px-3 py-2.5 text-center text-[12px] tabular-nums text-ink-500">{{ row.covered }}/6</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
 
       <template v-else>
         <!-- 排名 -->
@@ -269,9 +368,12 @@ const rangeStart = ref('')
 const rangeEnd = ref('')
 const statusFilter = ref('')
 const rankMetric = ref('avg') // 'avg' | 'single'
+const viewMode = ref('single') // 'single' | 'matrix'
 
 const loading = ref(false)
-const scores = ref([])
+const allScores = ref([])
+// 单项目分析所用的成绩（按当前项目过滤）
+const scores = computed(() => allScores.value.filter((s) => s.project === project.value))
 const students = ref([])
 const selectedIds = ref([])
 
@@ -286,6 +388,16 @@ const filteredStudents = computed(() =>
 
 function fmtSec(v) {
   return v == null ? '—' : `${Number(v).toFixed(2)}s`
+}
+
+/** 矩阵内紧凑显示：≥60 秒折叠为 m:ss.xx，便于窄单元格展示 */
+function fmtSecShort(v) {
+  if (v == null) return '—'
+  const n = Number(v)
+  const m = Math.floor(n / 60)
+  const s = n - m * 60
+  if (m > 0) return `${m}:${s.toFixed(2).padStart(5, '0')}`
+  return n.toFixed(2)
 }
 
 // ===== 排名（按项目 + 时间范围聚合）=====
@@ -318,6 +430,37 @@ const ranking = computed(() => {
 })
 
 const rankedCount = computed(() => ranking.value.filter((r) => r.count > 0).length)
+
+// ===== 跨项目矩阵（学员 × 6 项目 最佳成绩，按段位着色）=====
+const matrix = computed(() => {
+  const metric = rankMetric.value
+  const best = new Map() // studentId -> { project: value }
+  for (const s of allScores.value) {
+    const isDnf = metric === 'avg' ? s.avg_is_dnf : s.single_is_dnf
+    const val = metric === 'avg' ? s.avg_seconds : s.single_best_seconds
+    if (isDnf || val == null) continue
+    const v = Number(val)
+    let m = best.get(s.student_id)
+    if (!m) {
+      m = {}
+      best.set(s.student_id, m)
+    }
+    m[s.project] = m[s.project] == null ? v : Math.min(m[s.project], v)
+  }
+  const rows = filteredStudents.value.map((st) => {
+    const m = best.get(st.id) || {}
+    const cells = CUBE_PROJECTS.map((p) => {
+      const v = m[p.value] ?? null
+      return { project: p.value, value: v, rank: v == null ? null : rankForProject(p.value, v) }
+    })
+    return { student: st, cells, covered: cells.filter((c) => c.value != null).length }
+  })
+  rows.sort((a, b) => {
+    if (b.covered !== a.covered) return b.covered - a.covered
+    return a.student.name.localeCompare(b.student.name, 'zh')
+  })
+  return rows
+})
 
 function rankBadgeClass(i) {
   return i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-ink-300 text-white' : 'bg-orange-300 text-white'
@@ -437,20 +580,20 @@ async function loadScores() {
   }
   loading.value = true
   try {
-    scores.value = await listScoresForAnalysis({
-      project: project.value,
+    // 一次拉取时间范围内全部项目的成绩；单项目视图在内存中过滤，跨项目视图直接使用全量
+    allScores.value = await listScoresForAnalysis({
       start: rangeStart.value || null,
       end: rangeEnd.value || null,
     })
   } catch (err) {
     toast.error(err.message)
-    scores.value = []
+    allScores.value = []
   } finally {
     loading.value = false
   }
 }
 
-watch([project, rangeStart, rangeEnd], loadScores)
+watch([rangeStart, rangeEnd], loadScores)
 
 onMounted(() => {
   loadStudents()

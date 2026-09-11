@@ -70,6 +70,14 @@ export function cubeProjectMeta(value) {
   return CUBE_PROJECTS.find((p) => p.value === value) || null
 }
 
+/** 全部魔方项目的枚举值（顺序与 CUBE_PROJECTS 一致） */
+export const CUBE_PROJECT_VALUES = CUBE_PROJECTS.map((p) => p.value)
+
+/** 判断某个标签是否代表「适用魔方项目」（资源以项目枚举值作为标签存储） */
+export function isCubeProject(value) {
+  return CUBE_PROJECT_VALUES.includes(value)
+}
+
 /**
  * 魔方段位（里程碑）体系「默认阈值」。
  * 注意：段位现已支持后台「站点配置」可视化编辑，管理员保存后以
