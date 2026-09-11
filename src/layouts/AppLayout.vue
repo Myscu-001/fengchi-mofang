@@ -42,6 +42,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
+import { ensureRanksLoaded } from '@/lib/ranks'
 
 const auth = useAuthStore()
 const configured = isSupabaseConfigured
@@ -63,5 +64,7 @@ onMounted(async () => {
   } catch {
     // 未登录或网络异常时使用默认文案
   }
+  // 段位体系可能已被后台自定义，提前加载供全站段位展示使用
+  ensureRanksLoaded()
 })
 </script>

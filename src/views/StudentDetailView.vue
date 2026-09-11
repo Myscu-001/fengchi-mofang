@@ -467,7 +467,8 @@ import UiStat from '@/components/UiStat.vue'
 import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiPagination from '@/components/UiPagination.vue'
-import { CUBE_PROJECTS, CUBE_RANKS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS, rankForProject, nextRank } from '@/lib/dict'
+import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
+import { rankForProject, nextRank, rankTiers } from '@/lib/ranks'
 import { formatDate } from '@/lib/format'
 import { getStudent, updateStudent } from '@/api/students'
 import {
@@ -513,7 +514,7 @@ const ranks = computed(() => {
   return CUBE_PROJECTS.map((p) => {
     const best = m[p.value]?.bestAvg ?? null
     const rank = rankForProject(p.value, best)
-    const tiers = CUBE_RANKS[p.value] || []
+    const tiers = rankTiers(p.value)
     const idx = rank ? tiers.findIndex((t) => t.key === rank.key) : -1
     const next = idx >= 0 && idx < tiers.length - 1 ? tiers[idx + 1] : null
     return { ...p, bestAvg: best, rank, next }

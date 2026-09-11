@@ -71,9 +71,11 @@ export function cubeProjectMeta(value) {
 }
 
 /**
- * 魔方段位（里程碑）体系。按各项目「最佳平均成绩(Ao5)」自动评定，
- * 达到对应秒数阈值即点亮该段位。阈值统一在此调整，便于机构自定义。
- * tiers 由易到难排列；rankForProject 返回达到的最高段位。
+ * 魔方段位（里程碑）体系「默认阈值」。
+ * 注意：段位现已支持后台「站点配置」可视化编辑，管理员保存后以
+ * site_settings 的 cube.ranks 为准；此处仅作为未配置时的兜底默认值。
+ * 运行时读取请使用 @/lib/ranks 中的 rankForProject / nextRank / rankTiers。
+ * tiers 由易到难排列；max 为达到该段位所需的 Ao5 秒数上限（越小越难）。
  */
 export const CUBE_RANKS = {
   '2x2': [
@@ -110,28 +112,6 @@ export const CUBE_RANKS = {
     { key: 'r3', label: '竞速', max: 5, color: '#9B6FE0' },
     { key: 'r4', label: '大师', max: 3, color: '#EA625F' },
   ],
-}
-
-/** 根据某项目最佳平均成绩(秒)返回达到的最高段位，未达标返回 null */
-export function rankForProject(project, bestAvgSeconds) {
-  if (bestAvgSeconds == null || Number.isNaN(Number(bestAvgSeconds))) return null
-  const v = Number(bestAvgSeconds)
-  const tiers = CUBE_RANKS[project] || []
-  let met = null
-  for (const t of tiers) {
-    if (v < t.max) met = t
-  }
-  return met
-}
-
-/** 返回下一段位（用于展示「还差多少秒」），已是最高段位或未达到任何段位时返回 null */
-export function nextRank(project, bestAvgSeconds) {
-  const tiers = CUBE_RANKS[project] || []
-  const current = rankForProject(project, bestAvgSeconds)
-  if (!tiers.length) return null
-  const idx = current ? tiers.findIndex((t) => t.key === current.key) : -1
-  if (idx >= 0 && idx < tiers.length - 1) return tiers[idx + 1]
-  return null
 }
 
 /** 课程难度 1-5 */
