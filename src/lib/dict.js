@@ -70,6 +70,70 @@ export function cubeProjectMeta(value) {
   return CUBE_PROJECTS.find((p) => p.value === value) || null
 }
 
+/**
+ * 魔方段位（里程碑）体系。按各项目「最佳平均成绩(Ao5)」自动评定，
+ * 达到对应秒数阈值即点亮该段位。阈值统一在此调整，便于机构自定义。
+ * tiers 由易到难排列；rankForProject 返回达到的最高段位。
+ */
+export const CUBE_RANKS = {
+  '2x2': [
+    { key: 'r1', label: '入阶', max: 8, color: '#93BC37' },
+    { key: 'r2', label: '进阶', max: 5, color: '#34B4E2' },
+    { key: 'r3', label: '竞速', max: 3, color: '#EA625F' },
+  ],
+  '3x3': [
+    { key: 'r1', label: '入阶', max: 40, color: '#93BC37' },
+    { key: 'r2', label: '熟练', max: 30, color: '#F2A024' },
+    { key: 'r3', label: '提速', max: 20, color: '#34B4E2' },
+    { key: 'r4', label: '竞速', max: 15, color: '#9B6FE0' },
+    { key: 'r5', label: '大师', max: 10, color: '#EA625F' },
+  ],
+  '4x4': [
+    { key: 'r1', label: '入阶', max: 120, color: '#93BC37' },
+    { key: 'r2', label: '熟练', max: 90, color: '#F2A024' },
+    { key: 'r3', label: '竞速', max: 60, color: '#EA625F' },
+  ],
+  '5x5': [
+    { key: 'r1', label: '入阶', max: 240, color: '#93BC37' },
+    { key: 'r2', label: '熟练', max: 180, color: '#F2A024' },
+    { key: 'r3', label: '竞速', max: 120, color: '#EA625F' },
+  ],
+  pyraminx: [
+    { key: 'r1', label: '入阶', max: 15, color: '#93BC37' },
+    { key: 'r2', label: '熟练', max: 10, color: '#F2A024' },
+    { key: 'r3', label: '竞速', max: 7, color: '#9B6FE0' },
+    { key: 'r4', label: '大师', max: 5, color: '#EA625F' },
+  ],
+  skewb: [
+    { key: 'r1', label: '入阶', max: 12, color: '#93BC37' },
+    { key: 'r2', label: '熟练', max: 8, color: '#F2A024' },
+    { key: 'r3', label: '竞速', max: 5, color: '#9B6FE0' },
+    { key: 'r4', label: '大师', max: 3, color: '#EA625F' },
+  ],
+}
+
+/** 根据某项目最佳平均成绩(秒)返回达到的最高段位，未达标返回 null */
+export function rankForProject(project, bestAvgSeconds) {
+  if (bestAvgSeconds == null || Number.isNaN(Number(bestAvgSeconds))) return null
+  const v = Number(bestAvgSeconds)
+  const tiers = CUBE_RANKS[project] || []
+  let met = null
+  for (const t of tiers) {
+    if (v < t.max) met = t
+  }
+  return met
+}
+
+/** 返回下一段位（用于展示「还差多少秒」），已是最高段位或未达到任何段位时返回 null */
+export function nextRank(project, bestAvgSeconds) {
+  const tiers = CUBE_RANKS[project] || []
+  const current = rankForProject(project, bestAvgSeconds)
+  if (!tiers.length) return null
+  const idx = current ? tiers.findIndex((t) => t.key === current.key) : -1
+  if (idx >= 0 && idx < tiers.length - 1) return tiers[idx + 1]
+  return null
+}
+
 /** 课程难度 1-5 */
 export const LEVEL_LABELS = ['', '兴趣启蒙', '基础入门', '熟练应用', '进阶提速', '竞技特训']
 

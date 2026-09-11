@@ -1,6 +1,14 @@
 <template>
   <div>
-    <PageHeader title="学员档案" description="一人一档，记录学员基础信息、班级与成绩轨迹">
+    <PageHeader title="学员档案" description="一人一档，记录学员基础信息、状态与成绩轨迹">
+      <UiButton v-if="canView" variant="outline" @click="exportStudents">
+        <template #icon><Download class="size-4" /></template>
+        导出
+      </UiButton>
+      <UiButton v-if="canManage" variant="outline" @click="ioOpen = true">
+        <template #icon><Upload class="size-4" /></template>
+        导入
+      </UiButton>
       <UiButton v-if="canManage" variant="primary" @click="openForm(null)">
         <template #icon><UserPlus class="size-4" /></template>
         新增学员
@@ -216,6 +224,9 @@
       </template>
     </UiModal>
 
+    <!-- 批量导入 / 导出 -->
+    <ImportExportModal :open="ioOpen" @close="ioOpen = false" @imported="onImported" />
+
     <!-- 学员档案详情已迁移至独立的学员子页面（StudentDetailView） -->
   </div>
 </template>
@@ -224,12 +235,14 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
+  Download,
   Eye,
   PauseCircle,
   Pencil,
   RotateCcw,
   Search,
   Trash2,
+  Upload,
   UserCheck,
   UserMinus,
   UserPlus,
@@ -245,14 +258,17 @@ import UiLoading from '@/components/UiLoading.vue'
 import UiModal from '@/components/UiModal.vue'
 import UiField from '@/components/UiField.vue'
 import UiPagination from '@/components/UiPagination.vue'
+import ImportExportModal from '@/components/ImportExportModal.vue'
 import {
   listStudents,
   createStudent,
   updateStudent,
   deleteStudent,
+  buildStudentCsv,
 } from '@/api/students'
 import { STUDENT_STATUS, STUDENT_STATUS_OPTIONS, STUDENT_LEVEL_OPTIONS } from '@/lib/dict'
 import { formatDate } from '@/lib/format'
+import { downloadCsv } from '@/lib/csv'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
@@ -262,6 +278,7 @@ const toast = useToastStore()
 const dialog = useDialogStore()
 
 const canManage = computed(() => auth.can('student.manage'))
+const canView = computed(() => auth.can('student.view'))
 
 const students = ref([])
 const total = ref(0)
@@ -275,6 +292,7 @@ const formOpen = ref(false)
 const editing = ref(null)
 const saving = ref(false)
 const errorMsg = ref('')
+const ioOpen = ref(false)
 
 const router = useRouter()
 
@@ -348,6 +366,17 @@ async function loadCounts() {
 function applyFilters() {
   page.value = 1
   load()
+}
+
+function exportStudents() {
+  const csv = buildStudentCsv(students.value)
+  downloadCsv(`学员花名册_${formatDate(new Date())}.csv`, csv)
+  toast.success('已导出学员花名册')
+}
+
+function onImported() {
+  load()
+  loadCounts()
 }
 
 function resetFilters() {

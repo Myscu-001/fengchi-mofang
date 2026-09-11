@@ -137,6 +137,29 @@ export async function deleteScore(id) {
   if (error) throw new Error(errorMessage(error, '删除成绩失败'))
 }
 
+/** 聚合某学员在各魔方项目上的最佳平均成绩 / 最佳单次（用于段位评定与概览） */
+export async function studentProjectBests({ studentId }) {
+  const { data, error } = await supabase
+    .from(TABLES.scores)
+    .select('project,avg_seconds,avg_is_dnf,single_best_seconds,single_is_dnf')
+    .eq('student_id', studentId)
+
+  if (error) throw new Error(errorMessage(error, '加载成绩概览失败'))
+
+  const map = {}
+  for (const r of data || []) {
+    const p = r.project
+    map[p] = map[p] || { bestAvg: null, bestSingle: null }
+    if (!r.avg_is_dnf && r.avg_seconds != null) {
+      map[p].bestAvg = map[p].bestAvg == null ? Number(r.avg_seconds) : Math.min(map[p].bestAvg, Number(r.avg_seconds))
+    }
+    if (!r.single_is_dnf && r.single_best_seconds != null) {
+      map[p].bestSingle = map[p].bestSingle == null ? Number(r.single_best_seconds) : Math.min(map[p].bestSingle, Number(r.single_best_seconds))
+    }
+  }
+  return map
+}
+
 /** 批量删除（清空该学员该项目的全部成绩），返回被删条数 */
 export async function bulkDeleteScores({ studentId, project }) {
   const { data, error } = await supabase

@@ -74,3 +74,32 @@ export async function deleteStudent(id) {
   const { error } = await supabase.from(TABLES.students).delete().eq('id', id)
   if (error) throw new Error(errorMessage(error, '删除学员失败'))
 }
+
+/** 生成学员花名册 CSV 文本（含 BOM，便于 Excel 识别中文） */
+export function buildStudentCsv(list) {
+  const head = ['姓名', '性别', '昵称', '出生日期', '家长姓名', '家长电话', '电话', '学校', '年级', '水平', '加入日期', '状态']
+  const genderMap = { male: '男', female: '女', unknown: '未填写' }
+  const statusMap = { active: '在读', paused: '停课', graduated: '结业', left: '退学' }
+  const esc = (v) => {
+    const s = v == null ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = [head.join(',')]
+  for (const s of list || []) {
+    lines.push([
+      s.name,
+      genderMap[s.gender] || '未填写',
+      s.nickname || '',
+      s.birthday || '',
+      s.guardian_name || '',
+      s.guardian_phone || '',
+      s.phone || '',
+      s.school || '',
+      s.grade || '',
+      s.level || '',
+      s.joined_at || '',
+      statusMap[s.status] || '在读',
+    ].map(esc).join(','))
+  }
+  return '﻿' + lines.join('\n')
+}

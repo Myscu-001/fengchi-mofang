@@ -77,6 +77,7 @@
                   <th class="w-14 px-4 py-3 font-medium">名次</th>
                   <th class="px-4 py-3 font-medium">学员</th>
                   <th class="px-4 py-3 font-medium">水平</th>
+                  <th class="px-4 py-3 font-medium">段位</th>
                   <th class="px-4 py-3 font-medium">{{ rankMetric === 'avg' ? '最佳平均成绩' : '最佳单次成绩' }}</th>
                   <th class="px-4 py-3 text-right font-medium">记录数</th>
                 </tr>
@@ -108,6 +109,14 @@
                       :label="row.student.level"
                       custom-class="bg-brand-50 text-brand-700 border-brand-200"
                     />
+                    <span v-else class="text-ink-400">—</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span
+                      v-if="row.best != null && rankForProject(project, row.best)"
+                      class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                      :style="{ backgroundColor: rankForProject(project, row.best).color }"
+                    >{{ rankForProject(project, row.best).label }}</span>
                     <span v-else class="text-ink-400">—</span>
                   </td>
                   <td class="px-4 py-3 font-medium tabular-nums" :class="row.best == null ? 'text-ink-400' : 'text-ink-800'">
@@ -236,7 +245,7 @@ import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
 import UiLoading from '@/components/UiLoading.vue'
-import { CUBE_PROJECTS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
+import { CUBE_PROJECTS, STUDENT_STATUS_OPTIONS, rankForProject } from '@/lib/dict'
 import { formatDate } from '@/lib/format'
 import { listStudents } from '@/api/students'
 import { listScoresForAnalysis } from '@/api/analytics'

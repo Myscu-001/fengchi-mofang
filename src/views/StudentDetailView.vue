@@ -48,6 +48,36 @@
         </div>
       </div>
 
+      <!-- 魔方段位 -->
+      <div class="fc-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-900">
+            <Medal class="size-4 text-amber-500" />魔方段位
+          </h3>
+          <span class="text-[12px] text-ink-400">按各项目最佳平均成绩自动评定</span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div
+            v-for="r in ranks"
+            :key="r.value"
+            class="rounded-xl border border-ink-200 p-3"
+            :style="r.rank ? { borderColor: r.rank.color + '66', background: r.rank.color + '12' } : {}"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-[12.5px] font-medium text-ink-600">{{ r.label }}</span>
+              <span v-if="r.rank" class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white" :style="{ backgroundColor: r.rank.color }">{{ r.rank.label }}</span>
+              <span v-else class="text-[10px] text-ink-400">未达标</span>
+            </div>
+            <div class="mt-1.5 text-[12px] text-ink-500">
+              最佳平均 <span class="font-semibold tabular-nums text-ink-700">{{ r.bestAvg != null ? r.bestAvg.toFixed(2) + 's' : '—' }}</span>
+            </div>
+            <div v-if="r.next" class="mt-0.5 text-[11px] text-ink-400">
+              距离「{{ r.next.label }}」还差 {{ Math.max(0, (r.bestAvg != null ? r.bestAvg : r.next.max) - r.next.max).toFixed(2) }}s
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 魔方项目切换 -->
       <div class="flex flex-wrap gap-1.5">
         <button
@@ -94,6 +124,10 @@
             <UiButton v-if="scores.length" variant="outline" size="sm" @click="exportCsv">
               <template #icon><Download class="size-3.5" /></template>
               导出
+            </UiButton>
+            <UiButton v-if="canManage" variant="outline" size="sm" @click="openQuick">
+              <template #icon><Zap class="size-3.5" /></template>
+              快速录入
             </UiButton>
             <UiButton v-if="canManage" variant="primary" size="sm" @click="openAdd">
               <template #icon><Plus class="size-3.5" /></template>
@@ -355,6 +389,45 @@
       </template>
     </UiModal>
 
+    <!-- 快速录入成绩 -->
+    <UiModal :open="quickOpen" title="快速录入成绩" width="md" @close="quickOpen = false">
+      <div class="space-y-4">
+        <div class="rounded-[10px] bg-brand-50 px-3.5 py-2.5 text-[12.5px] text-brand-700">
+          当前项目：<span class="font-semibold">{{ cubeMeta?.label }}</span>。每行填一个单次时间（秒，支持 <code>DNF</code>），系统自动按 Ao5 计算平均成绩。
+        </div>
+        <UiField label="日期">
+          <input v-model="quickDate" type="date" class="fc-input" :max="today" />
+        </UiField>
+        <UiField label="单次时间（每行一个）" :hint="`已识别 ${quickParse.attempts.length} 个有效${quickParse.invalid ? '，' + quickParse.invalid + ' 行无效' : ''}`">
+          <textarea v-model="quickText" rows="6" class="fc-input font-mono text-[13px]" placeholder="12.34&#10;11.80&#10;DNF&#10;10.92&#10;11.20"></textarea>
+        </UiField>
+        <div class="rounded-xl bg-ink-50 px-3.5 py-3 text-[13px]">
+          <div class="flex justify-between">
+            <span class="text-ink-500">平均成绩 (Ao5)</span>
+            <span class="font-semibold" :class="quickCalc.avgIsDnf ? 'text-red-500' : 'text-brand-700'">
+              {{ quickCalc.avgIsDnf ? 'DNF' : (quickCalc.avgSeconds != null ? quickCalc.avgSeconds.toFixed(2) + ' 秒' : '—') }}
+            </span>
+          </div>
+          <div class="mt-1 flex justify-between">
+            <span class="text-ink-500">单次最佳</span>
+            <span class="font-semibold" :class="quickCalc.singleIsDnf ? 'text-red-500' : 'text-orange-600'">
+              {{ quickCalc.singleIsDnf ? 'DNF' : (quickCalc.singleBestSeconds != null ? quickCalc.singleBestSeconds.toFixed(2) + ' 秒' : '—') }}
+            </span>
+          </div>
+        </div>
+        <UiField label="备注">
+          <input v-model="quickNote" class="fc-input" placeholder="可选，如「周测」" />
+        </UiField>
+        <p v-if="quickError" class="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700">
+          {{ quickError }}
+        </p>
+      </div>
+      <template #footer>
+        <UiButton variant="outline" @click="quickOpen = false">取消</UiButton>
+        <UiButton variant="primary" :loading="quickSaving" :disabled="!canSaveQuick" @click="saveQuick">保存</UiButton>
+      </template>
+    </UiModal>
+
     <!-- 编辑学员资料 -->
     <UiModal :open="studentEditOpen" title="编辑学员资料" width="lg" @close="studentEditOpen = false">
       <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="saveStudent">
@@ -413,6 +486,7 @@ import {
   CalendarClock,
   Download,
   ListChecks,
+  Medal,
   Pencil,
   Plus,
   Timer,
@@ -432,12 +506,13 @@ import UiStat from '@/components/UiStat.vue'
 import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiPagination from '@/components/UiPagination.vue'
-import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
+import { CUBE_PROJECTS, CUBE_RANKS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS, rankForProject, nextRank } from '@/lib/dict'
 import { formatDate } from '@/lib/format'
 import { getStudent, updateStudent } from '@/api/students'
 import {
   listScores,
   scoreStats,
+  studentProjectBests,
   createScore,
   updateScore,
   deleteScore,
@@ -470,6 +545,19 @@ const bulkDeleted = ref([])
 
 const cubeMeta = computed(() => CUBE_PROJECTS.find((p) => p.value === project.value) || null)
 const today = new Date().toISOString().slice(0, 10)
+
+const bests = ref({})
+const ranks = computed(() => {
+  const m = bests.value || {}
+  return CUBE_PROJECTS.map((p) => {
+    const best = m[p.value]?.bestAvg ?? null
+    const rank = rankForProject(p.value, best)
+    const tiers = CUBE_RANKS[p.value] || []
+    const idx = rank ? tiers.findIndex((t) => t.key === rank.key) : -1
+    const next = idx >= 0 && idx < tiers.length - 1 ? tiers[idx + 1] : null
+    return { ...p, bestAvg: best, rank, next }
+  })
+})
 
 function ageOf(birthday) {
   if (!birthday) return '—'
@@ -807,6 +895,88 @@ function exportCsv() {
   toast.success('已导出 CSV')
 }
 
+// ===== 快速录入 =====
+const quickOpen = ref(false)
+const quickText = ref('')
+const quickDate = ref(today)
+const quickNote = ref('')
+const quickSaving = ref(false)
+const quickError = ref('')
+
+const quickParse = computed(() => {
+  const lines = String(quickText.value || '').split(/\r?\n/)
+  const attempts = []
+  let invalid = 0
+  for (const raw of lines) {
+    const s = raw.trim()
+    if (!s) continue
+    if (/^dnf$/i.test(s)) {
+      attempts.push({ value: null, is_dnf: true })
+      continue
+    }
+    let val
+    if (/:/.test(s)) {
+      const parts = s.split(':')
+      const m = parseFloat(parts[0])
+      const sec = parseFloat(String(parts[1] || '').replace(',', '.'))
+      if (!Number.isNaN(m) && !Number.isNaN(sec)) val = m * 60 + sec
+    } else {
+      val = parseFloat(s.replace(',', '.'))
+    }
+    if (val == null || Number.isNaN(val) || val <= 0) {
+      invalid += 1
+      continue
+    }
+    attempts.push({ value: round2(val), is_dnf: false })
+  }
+  return { attempts, invalid }
+})
+const quickCalc = computed(() => computeAo5(quickParse.value.attempts))
+const canSaveQuick = computed(() => !!quickDate.value && quickParse.value.attempts.length >= 3 && quickParse.value.invalid === 0)
+
+function openQuick() {
+  quickError.value = ''
+  quickText.value = ''
+  quickNote.value = ''
+  quickDate.value = today
+  quickOpen.value = true
+}
+
+async function saveQuick() {
+  quickError.value = ''
+  if (!quickDate.value) {
+    quickError.value = '请选择日期'
+    return
+  }
+  const { attempts, invalid } = quickParse.value
+  if (invalid > 0) {
+    quickError.value = `有 ${invalid} 行时间无法识别，请检查后重试`
+    return
+  }
+  if (attempts.length < 3) {
+    quickError.value = '至少录入 3 个有效单次时间'
+    return
+  }
+  quickSaving.value = true
+  try {
+    await createScore({
+      studentId: student.value.id,
+      project: project.value,
+      recordedAt: quickDate.value,
+      mode: 'detail',
+      note: quickNote.value.trim() || null,
+      attempts,
+    })
+    toast.success('成绩已保存')
+    quickOpen.value = false
+    await loadProject()
+  } catch (err) {
+    quickError.value = err.message
+  } finally {
+    quickSaving.value = false
+  }
+}
+
 // ===== 学员资料编辑 =====
 const studentEditOpen = ref(false)
 const studentSaving = ref(false)
@@ -886,11 +1056,19 @@ async function load() {
   loading.value = true
   try {
     student.value = await getStudent(route.params.id)
-    if (student.value) await loadProject()
+    if (student.value) await Promise.all([loadProject(), loadBests()])
   } catch (err) {
     toast.error(err.message)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadBests() {
+  try {
+    bests.value = await studentProjectBests({ studentId: student.value.id })
+  } catch {
+    bests.value = {}
   }
 }
 
