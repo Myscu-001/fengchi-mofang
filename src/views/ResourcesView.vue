@@ -489,6 +489,18 @@
           v-else-if="previewKind === 'text'"
           class="max-h-[70vh] overflow-auto rounded-lg bg-ink-50 p-4 text-[12.5px] leading-relaxed text-ink-700"
         >{{ previewText }}</pre>
+        <div v-else-if="previewKind === 'pdf-mobile'" class="py-12 text-center">
+          <p class="text-[13.5px] text-ink-500">手机浏览器不支持内嵌预览 PDF，请点击下方按钮用系统阅读器打开。</p>
+          <a
+            :href="previewSrc"
+            target="_blank"
+            rel="noopener"
+            class="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-brand-600 px-4 py-2 text-[13px] font-medium text-white shadow-soft transition hover:bg-brand-700"
+          >
+            <ExternalLink class="size-3.5" />
+            打开 PDF
+          </a>
+        </div>
         <div v-else class="py-12 text-center">
           <p class="text-[13.5px] text-ink-500">
             此文件类型（{{ previewLabel }}）暂不支持在线预览，请在下方下载，或点击「新窗口打开」由浏览器尝试查看。
@@ -952,6 +964,18 @@ async function copyLink(res) {
 const AUDIO_EXTS = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac']
 const TEXT_EXTS = ['txt', 'md']
 
+/**
+ * 是否移动端 / 触屏环境。
+ * 移动端浏览器普遍无法在 iframe 内渲染 PDF（iOS 白屏、Android 触发下载），
+ * 因此 PDF 在移动端改为交给系统阅读器打开。
+ */
+function isMobileEnv() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  if (/Android|iPhone|iPad|iPod|Mobile|Windows Phone|HarmonyOS|MicroMessenger/i.test(ua)) return true
+  return (navigator.maxTouchPoints || 0) > 1 && window.innerWidth <= 900
+}
+
 async function openPreview(res) {
   previewing.value = res
   previewOpen.value = true
@@ -964,8 +988,23 @@ async function openPreview(res) {
     const kind = res.file_type
     // 音频文件在 detectFileKind 里被归入 video，这里单独识别
     if (kind === 'image' || kind === 'pdf' || kind === 'video' || AUDIO_EXTS.includes(ext)) {
+      const url = await previewUrl(res)
+      // 移动端 PDF：不走 iframe，直接调用系统阅读器
+      if (kind === 'pdf' && isMobileEnv()) {
+        const win = window.open(url, '_blank', 'noopener')
+        if (win) {
+          // 已成功打开，无需站内弹窗
+          previewOpen.value = false
+          previewing.value = null
+          return
+        }
+        // 被浏览器拦截：退化为「手动点击打开」面板
+        previewKind.value = 'pdf-mobile'
+        previewSrc.value = url
+        return
+      }
       previewKind.value = AUDIO_EXTS.includes(ext) ? 'audio' : kind
-      previewSrc.value = await previewUrl(res)
+      previewSrc.value = url
     } else if (kind === 'document' && TEXT_EXTS.includes(ext)) {
       previewKind.value = 'text'
       const url = await previewUrl(res)
