@@ -125,10 +125,6 @@
               <template #icon><Download class="size-3.5" /></template>
               导出
             </UiButton>
-            <UiButton v-if="canManage" variant="outline" size="sm" @click="openQuick">
-              <template #icon><Zap class="size-3.5" /></template>
-              快速录入
-            </UiButton>
             <UiButton v-if="canManage" variant="primary" size="sm" @click="openAdd">
               <template #icon><Plus class="size-3.5" /></template>
               新增成绩
@@ -330,31 +326,34 @@
           </UiField>
         </div>
 
-        <!-- 详细模式 -->
+        <!-- 详细模式：5 次单次时间，竖排，自动识别写法 -->
         <div v-else class="space-y-3">
-          <p class="text-[12px] text-ink-500">录入 5 个单次时间（纯数字，自动 ÷100 换算为秒），可勾选 DNF。</p>
+          <p class="text-[12px] leading-relaxed text-ink-500">
+            录入 5 个单次时间（竖排）。<b class="text-ink-600">纯数字自动识别</b>：<code class="rounded bg-ink-100 px-1">1134</code> → 11.34 秒，<code class="rounded bg-ink-100 px-1">12345</code> → 1:23.45；<b class="text-ink-600">留空或填非数字即记为 DNF</b>。
+          </p>
           <div
             v-for="(at, i) in scoreForm.attempts"
             :key="i"
-            class="flex items-center gap-2.5 rounded-xl border border-ink-200 px-3 py-2"
+            class="flex items-center gap-2.5 rounded-xl border px-3 py-2"
+            :class="attemptInfo(at).is_dnf ? 'border-red-200 bg-red-50' : 'border-ink-200'"
           >
             <span class="w-5 shrink-0 text-[13px] font-semibold text-ink-400">{{ i + 1 }}</span>
             <input
               v-model="at.raw"
-              :disabled="at.is_dnf"
               inputmode="numeric"
-              maxlength="6"
-              class="fc-input flex-1 disabled:bg-ink-100 disabled:text-ink-300"
-              :placeholder="at.is_dnf ? 'DNF' : '整数，如 1234'"
-              @input="onAttemptInput(at)"
+              maxlength="8"
+              class="fc-input flex-1"
+              :class="attemptInfo(at).is_dnf ? 'text-red-500 placeholder-red-300' : ''"
+              :placeholder="'留空 / 非数字 = DNF，如 1134 / 12345'"
             />
-            <span v-if="!at.is_dnf" class="w-16 shrink-0 text-right text-[12px] tabular-nums text-ink-500">
-              {{ at.raw && Number(at.raw) > 0 ? `→${(Number(at.raw) / 100).toFixed(2)}秒` : '' }}
-            </span>
-            <label class="flex shrink-0 cursor-pointer items-center gap-1 text-[12px] text-ink-500">
-              <input v-model="at.is_dnf" type="checkbox" class="size-4 accent-red-500" @change="onAttemptDnfToggle(at)" />
-              DNF
-            </label>
+            <span
+              v-if="attemptInfo(at).is_dnf"
+              class="w-16 shrink-0 text-right text-[12px] font-medium text-red-500"
+            >DNF</span>
+            <span
+              v-else
+              class="w-20 shrink-0 text-right text-[12px] tabular-nums text-brand-600"
+            >{{ attemptInfo(at).preview }}</span>
           </div>
 
           <div class="rounded-xl bg-ink-50 px-3.5 py-3 text-[13px]">
@@ -389,44 +388,6 @@
       </template>
     </UiModal>
 
-    <!-- 快速录入成绩 -->
-    <UiModal :open="quickOpen" title="快速录入成绩" width="md" @close="quickOpen = false">
-      <div class="space-y-4">
-        <div class="rounded-[10px] bg-brand-50 px-3.5 py-2.5 text-[12.5px] text-brand-700">
-          当前项目：<span class="font-semibold">{{ cubeMeta?.label }}</span>。每行填一个单次时间（秒，支持 <code>DNF</code>），系统自动按 Ao5 计算平均成绩。
-        </div>
-        <UiField label="日期">
-          <input v-model="quickDate" type="date" class="fc-input" :max="today" />
-        </UiField>
-        <UiField label="单次时间（每行一个）" :hint="`已识别 ${quickParse.attempts.length} 个有效${quickParse.invalid ? '，' + quickParse.invalid + ' 行无效' : ''}`">
-          <textarea v-model="quickText" rows="6" class="fc-input font-mono text-[13px]" placeholder="12.34&#10;11.80&#10;DNF&#10;10.92&#10;11.20"></textarea>
-        </UiField>
-        <div class="rounded-xl bg-ink-50 px-3.5 py-3 text-[13px]">
-          <div class="flex justify-between">
-            <span class="text-ink-500">平均成绩 (Ao5)</span>
-            <span class="font-semibold" :class="quickCalc.avgIsDnf ? 'text-red-500' : 'text-brand-700'">
-              {{ quickCalc.avgIsDnf ? 'DNF' : (quickCalc.avgSeconds != null ? quickCalc.avgSeconds.toFixed(2) + ' 秒' : '—') }}
-            </span>
-          </div>
-          <div class="mt-1 flex justify-between">
-            <span class="text-ink-500">单次最佳</span>
-            <span class="font-semibold" :class="quickCalc.singleIsDnf ? 'text-red-500' : 'text-orange-600'">
-              {{ quickCalc.singleIsDnf ? 'DNF' : (quickCalc.singleBestSeconds != null ? quickCalc.singleBestSeconds.toFixed(2) + ' 秒' : '—') }}
-            </span>
-          </div>
-        </div>
-        <UiField label="备注">
-          <input v-model="quickNote" class="fc-input" placeholder="可选，如「周测」" />
-        </UiField>
-        <p v-if="quickError" class="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700">
-          {{ quickError }}
-        </p>
-      </div>
-      <template #footer>
-        <UiButton variant="outline" @click="quickOpen = false">取消</UiButton>
-        <UiButton variant="primary" :loading="quickSaving" :disabled="!canSaveQuick" @click="saveQuick">保存</UiButton>
-      </template>
-    </UiModal>
 
     <!-- 编辑学员资料 -->
     <UiModal :open="studentEditOpen" title="编辑学员资料" width="lg" @close="studentEditOpen = false">
@@ -580,6 +541,61 @@ function round2(n) {
   return Math.round(Number(n) * 100) / 100
 }
 
+// 单次时间输入框解析：纯数字自动识别写法，无数字（留空/非数字）即 DNF
+// 规则：末 2 位为百分秒，其余数字按「[分][秒]」解读（秒占末 2 位，前缀为分）
+// 例：1134 -> 11.34 秒；12345 -> 1:23.45
+function parseAttemptRaw(raw) {
+  const digits = String(raw == null ? '' : raw).replace(/\D/g, '')
+  if (!digits) return { value: null, is_dnf: true }
+  const cs = parseInt(digits.slice(-2), 10)
+  const before = digits.slice(0, -2)
+  let minutes = 0
+  let seconds = 0
+  if (before === '') {
+    seconds = 0
+  } else if (before.length <= 2) {
+    seconds = parseInt(before, 10)
+  } else {
+    seconds = parseInt(before.slice(-2), 10)
+    minutes = parseInt(before.slice(0, -2), 10) || 0
+  }
+  const value = round2(minutes * 60 + seconds + cs / 100)
+  if (value <= 0) return { value: null, is_dnf: true }
+  return { value, is_dnf: false }
+}
+
+// 秒 -> 展示串（>=60 用 分:秒.百分秒 写法）
+function fmtTimeShort(v) {
+  if (v == null) return 'DNF'
+  const minutes = Math.floor(v / 60)
+  const secPart = v - minutes * 60
+  if (minutes > 0) {
+    const s = Math.floor(secPart)
+    const cs = Math.round((secPart - s) * 100)
+    return `${minutes}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
+  }
+  return secPart.toFixed(2)
+}
+
+// 展示串 -> 纯数字原始串（编辑回显时保证新解析可无损还原）
+function valueToRaw(v) {
+  if (v == null) return ''
+  const minutes = Math.floor(Number(v) / 60)
+  const rem = Number(v) - minutes * 60
+  const secs = Math.floor(rem)
+  const cs = Math.round((rem - secs) * 100)
+  return `${minutes}${String(secs).padStart(2, '0')}${String(cs).padStart(2, '0')}`
+}
+
+function attemptInfo(at) {
+  const p = parseAttemptRaw(at.raw)
+  return {
+    ...p,
+    display: fmtTimeShort(p.value),
+    preview: p.is_dnf ? 'DNF' : p.value >= 60 ? fmtTimeShort(p.value) : `${fmtTimeShort(p.value)}秒`,
+  }
+}
+
 // PB 标记：按当前项目历史最小平均 / 最小单次（四舍五入到两位小数比对）
 const decoratedScores = computed(() => {
   const avgVals = scores.value.filter((r) => !r.avg_is_dnf && r.avg_seconds != null).map((r) => round2(r.avg_seconds))
@@ -696,7 +712,7 @@ const scoreSaving = ref(false)
 const scoreError = ref('')
 
 function blankAttempt() {
-  return { raw: '', is_dnf: false }
+  return { raw: '' }
 }
 
 const scoreForm = reactive({
@@ -708,28 +724,17 @@ const scoreForm = reactive({
   note: '',
 })
 
-function onAttemptInput(at) {
-  at.raw = String(at.raw || '').replace(/\D/g, '').slice(0, 6)
-}
-
-function onAttemptDnfToggle(at) {
-  if (at.is_dnf) at.raw = ''
-}
-
 const detailCalc = computed(() => {
-  const attempts = scoreForm.attempts.map((a) => ({
-    value: a.is_dnf || !a.raw ? null : Number(a.raw) / 100,
-    is_dnf: a.is_dnf,
-  }))
+  const attempts = scoreForm.attempts.map((a) => parseAttemptRaw(a.raw))
   return computeAo5(attempts)
 })
 
 const detailHint = computed(() => {
-  const valid = scoreForm.attempts.filter((a) => !a.is_dnf && Number(a.raw) > 0).length
-  const dnf = scoreForm.attempts.filter((a) => a.is_dnf).length
-  if (dnf >= 3) return '有效成绩不足 3 次，平均成绩记为 DNF'
+  const valid = scoreForm.attempts.filter((a) => !attemptInfo(a).is_dnf).length
+  const dnf = 5 - valid
   if (dnf === 5) return '所有成绩均为 DNF'
-  if (valid < 5 && dnf === 0) return '请完整录入 5 个有效单次时间'
+  if (valid < 3) return '有效成绩不足 3 次，平均成绩记为 DNF'
+  if (valid < 5) return `还有 ${5 - valid} 次留空，将记为 DNF`
   return ''
 })
 
@@ -737,9 +742,8 @@ const canSaveScore = computed(() => {
   if (scoreForm.mode === 'simple') {
     return scoreForm.avgSeconds !== '' && scoreForm.singleBestSeconds !== ''
   }
-  const valid = scoreForm.attempts.filter((a) => !a.is_dnf && Number(a.raw) > 0).length
-  const dnf = scoreForm.attempts.filter((a) => a.is_dnf).length
-  return valid + dnf === 5
+  const valid = scoreForm.attempts.filter((a) => !attemptInfo(a).is_dnf).length
+  return valid >= 1
 })
 
 function openAdd() {
@@ -761,8 +765,7 @@ function openEdit(row) {
   scoreError.value = ''
   if (row.mode === 'detail') {
     const attempts = (row.attempts && Array.isArray(row.attempts) ? row.attempts : []).map((a) => ({
-      raw: a.is_dnf || a.value == null ? '' : String(Math.round(Number(a.value) * 100)),
-      is_dnf: !!a.is_dnf,
+      raw: a.is_dnf || a.value == null ? '' : valueToRaw(a.value),
     }))
     while (attempts.length < 5) attempts.push(blankAttempt())
     Object.assign(scoreForm, {
@@ -793,7 +796,10 @@ async function saveScore() {
     return
   }
   if (scoreForm.mode === 'detail') {
-    const overMax = scoreForm.attempts.some((a) => !a.is_dnf && Number(a.raw) > 360000)
+    const overMax = scoreForm.attempts.some((a) => {
+      const p = parseAttemptRaw(a.raw)
+      return !p.is_dnf && p.value > 3600
+    })
     if (overMax && !(await dialog.confirm({ title: '时间超出合理范围', message: '有单次时间超过 1 小时，确认仍要保存吗？', confirmText: '强制保存' }))) {
       return
     }
@@ -808,10 +814,7 @@ async function saveScore() {
       note: scoreForm.note.trim() || null,
     }
     if (scoreForm.mode === 'detail') {
-      payload.attempts = scoreForm.attempts.map((a) => ({
-        value: a.is_dnf || !a.raw ? null : Number(a.raw) / 100,
-        is_dnf: a.is_dnf,
-      }))
+      payload.attempts = scoreForm.attempts.map((a) => parseAttemptRaw(a.raw))
     } else {
       payload.avgSeconds = scoreForm.avgSeconds
       payload.singleBestSeconds = scoreForm.singleBestSeconds
@@ -893,88 +896,6 @@ function exportCsv() {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
   toast.success('已导出 CSV')
-}
-
-// ===== 快速录入 =====
-const quickOpen = ref(false)
-const quickText = ref('')
-const quickDate = ref(today)
-const quickNote = ref('')
-const quickSaving = ref(false)
-const quickError = ref('')
-
-const quickParse = computed(() => {
-  const lines = String(quickText.value || '').split(/\r?\n/)
-  const attempts = []
-  let invalid = 0
-  for (const raw of lines) {
-    const s = raw.trim()
-    if (!s) continue
-    if (/^dnf$/i.test(s)) {
-      attempts.push({ value: null, is_dnf: true })
-      continue
-    }
-    let val
-    if (/:/.test(s)) {
-      const parts = s.split(':')
-      const m = parseFloat(parts[0])
-      const sec = parseFloat(String(parts[1] || '').replace(',', '.'))
-      if (!Number.isNaN(m) && !Number.isNaN(sec)) val = m * 60 + sec
-    } else {
-      val = parseFloat(s.replace(',', '.'))
-    }
-    if (val == null || Number.isNaN(val) || val <= 0) {
-      invalid += 1
-      continue
-    }
-    attempts.push({ value: round2(val), is_dnf: false })
-  }
-  return { attempts, invalid }
-})
-const quickCalc = computed(() => computeAo5(quickParse.value.attempts))
-const canSaveQuick = computed(() => !!quickDate.value && quickParse.value.attempts.length >= 3 && quickParse.value.invalid === 0)
-
-function openQuick() {
-  quickError.value = ''
-  quickText.value = ''
-  quickNote.value = ''
-  quickDate.value = today
-  quickOpen.value = true
-}
-
-async function saveQuick() {
-  quickError.value = ''
-  if (!quickDate.value) {
-    quickError.value = '请选择日期'
-    return
-  }
-  const { attempts, invalid } = quickParse.value
-  if (invalid > 0) {
-    quickError.value = `有 ${invalid} 行时间无法识别，请检查后重试`
-    return
-  }
-  if (attempts.length < 3) {
-    quickError.value = '至少录入 3 个有效单次时间'
-    return
-  }
-  quickSaving.value = true
-  try {
-    await createScore({
-      studentId: student.value.id,
-      project: project.value,
-      recordedAt: quickDate.value,
-      mode: 'detail',
-      note: quickNote.value.trim() || null,
-      attempts,
-    })
-    toast.success('成绩已保存')
-    quickOpen.value = false
-    await loadProject()
-  } catch (err) {
-    quickError.value = err.message
-  } finally {
-    quickSaving.value = false
-  }
 }
 
 // ===== 学员资料编辑 =====
