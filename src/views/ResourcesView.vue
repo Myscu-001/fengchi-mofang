@@ -59,7 +59,12 @@
           <div class="fc-card mt-3.5 p-4">
             <h3 class="text-[13px] font-semibold text-ink-800">下载排行</h3>
             <ul v-if="topList.length" class="mt-2.5 space-y-2.5">
-              <li v-for="(r, i) in topList" :key="r.id" class="flex items-start gap-2">
+              <li
+                v-for="(r, i) in topList"
+                :key="r.id"
+                class="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-0.5 transition hover:bg-ink-50"
+                @click="openResource(r)"
+              >
                 <span
                   class="mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded text-[10px] font-semibold"
                   :class="i < 3 ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'"

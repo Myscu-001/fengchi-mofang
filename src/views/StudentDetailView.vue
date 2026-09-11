@@ -346,17 +346,23 @@
         </div>
         <UiLoading v-if="relatedLoading" text="加载相关资源…" />
         <div v-else-if="relatedResources.length" class="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          <div
+          <button
             v-for="res in relatedResources"
             :key="res.id"
-            class="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 transition hover:border-brand-200 hover:bg-brand-50/40"
+            type="button"
+            class="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 text-left transition hover:border-brand-300 hover:bg-brand-50/50"
+            :title="isLinkResource(res) ? '打开外部链接' : '打开资源'"
+            @click="openRelated(res)"
           >
             <ResourceIcon :kind="res.file_type" />
             <div class="min-w-0 flex-1">
               <p class="line-clamp-1 text-[13px] font-medium text-ink-800" :title="res.title">{{ res.title }}</p>
-              <p class="mt-0.5 line-clamp-1 text-[11.5px] text-ink-400" :title="res.file_name">{{ res.file_name }}</p>
+              <p class="mt-0.5 line-clamp-1 text-[11.5px] text-ink-400" :title="res.file_name">
+                {{ isLinkResource(res) ? res.file_path : res.file_name }}
+              </p>
             </div>
-          </div>
+            <ExternalLink class="mt-0.5 size-3.5 shrink-0 text-ink-300" />
+          </button>
         </div>
         <p v-else class="mt-2 py-4 text-center text-[12.5px] text-ink-400">
           暂无「{{ cubeMeta?.label }}」相关教学资源，可在资源中心上传时绑定该魔方项目。
@@ -575,6 +581,7 @@ import {
   ArrowLeft,
   CalendarClock,
   Download,
+  ExternalLink,
   FileText,
   FolderOpen,
   ListChecks,
@@ -615,7 +622,7 @@ import {
   buildScoreCsv,
   computeAo5,
 } from '@/api/scores'
-import { listResourcesByTag } from '@/api/resources'
+import { listResourcesByTag, isLinkResource, previewUrl } from '@/api/resources'
 import { loadGoals, saveGoals } from '@/api/goals'
 import { getSetting } from '@/api/settings'
 import { useAuthStore } from '@/stores/auth'
@@ -1201,6 +1208,20 @@ async function loadRelated() {
     relatedResources.value = []
   } finally {
     relatedLoading.value = false
+  }
+}
+
+/** 打开关联资源：链接型直接跳转外部地址，文件型打开签名预览链接 */
+async function openRelated(res) {
+  try {
+    if (isLinkResource(res)) {
+      window.open(res.file_path, '_blank', 'noopener')
+      return
+    }
+    const url = await previewUrl(res)
+    window.open(url, '_blank', 'noopener')
+  } catch (err) {
+    toast.error(err.message)
   }
 }
 
