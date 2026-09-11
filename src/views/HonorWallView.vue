@@ -116,6 +116,63 @@
           </div>
         </section>
       </template>
+
+      <!-- 进步之星 -->
+      <section v-if="improvementBoard.length" class="fc-card overflow-hidden">
+        <div class="flex flex-wrap items-center gap-2 border-b border-ink-200 px-4 py-3">
+          <TrendingUp class="size-4 text-emerald-500" />
+          <h3 class="text-[14px] font-semibold text-ink-800">进步之星</h3>
+          <span class="text-[12px] text-ink-400">近 {{ RECENT_DAYS }} 天刷新个人最好平均成绩，提升最大的学员</span>
+        </div>
+        <ul class="divide-y divide-ink-100">
+          <li
+            v-for="(row, i) in improvementBoard"
+            :key="row.student.id"
+            class="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-ink-50/60"
+            @click="goStudent(row.student.id)"
+          >
+            <span class="flex size-6 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold" :class="placeClass(i)">
+              {{ i + 1 }}
+            </span>
+            <UiAvatar :src="row.student.avatar_url" :name="row.student.name" size="xs" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[13px] font-medium text-ink-800">{{ row.student.name }}</p>
+              <p class="text-[11px] text-ink-400">
+                {{ projectLabel(row.project) }} · {{ fmtSec(row.base) }} → {{ fmtSec(row.recent) }}
+              </p>
+            </div>
+            <span class="shrink-0 text-[13px] font-bold tabular-nums text-emerald-600">-{{ row.delta.toFixed(2) }}s</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 待关注 -->
+      <section v-if="attentionList.length" class="fc-card overflow-hidden">
+        <div class="flex flex-wrap items-center gap-2 border-b border-ink-200 px-4 py-3">
+          <TriangleAlert class="size-4 text-amber-500" />
+          <h3 class="text-[14px] font-semibold text-ink-800">待关注</h3>
+          <span class="text-[12px] text-ink-400">超过 {{ RECENT_DAYS }} 天未测试（含从未测试）</span>
+        </div>
+        <ul class="divide-y divide-ink-100">
+          <li
+            v-for="row in attentionList"
+            :key="row.student.id"
+            class="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-ink-50/60"
+            @click="goStudent(row.student.id)"
+          >
+            <UiAvatar :src="row.student.avatar_url" :name="row.student.name" size="xs" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[13px] font-medium text-ink-800">{{ row.student.name }}</p>
+              <p class="text-[11px] text-ink-400">
+                {{ row.lastDate ? '最后测试 ' + formatDate(row.lastDate) : '从未测试' }}
+              </p>
+            </div>
+            <span class="shrink-0 text-[12px] font-medium text-amber-600">
+              {{ row.days == null ? '未测试' : row.days + ' 天未测' }}
+            </span>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
@@ -123,7 +180,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Crown, RotateCcw, Timer, Trophy, Zap } from 'lucide-vue-next'
+import { Crown, RotateCcw, Timer, Trophy, Zap, TrendingUp, TriangleAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
@@ -219,6 +276,75 @@ const totalStars = computed(() =>
     0,
   ),
 )
+
+// ===== 进步之星 / 待关注 =====
+const RECENT_DAYS = 30
+const recentCut = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() - RECENT_DAYS)
+  return d.toISOString().slice(0, 10)
+})()
+const todayMs = Date.now()
+
+function projectLabel(value) {
+  return CUBE_PROJECTS.find((p) => p.value === value)?.label || value
+}
+
+const studentIdSet = computed(() => new Set(filteredStudents.value.map((s) => s.id)))
+
+/** 进步之星：近 30 天刷新个人最好平均成绩、且提升幅度最大的学员 */
+const improvementBoard = computed(() => {
+  const ok = studentIdSet.value
+  const byKey = new Map() // studentId|project -> { recent, base }
+  for (const s of allScores.value) {
+    if (s.avg_is_dnf || s.avg_seconds == null) continue
+    if (!ok.has(s.student_id)) continue
+    const key = `${s.student_id}|${s.project}`
+    let e = byKey.get(key)
+    if (!e) {
+      e = { recent: null, base: null }
+      byKey.set(key, e)
+    }
+    const v = Number(s.avg_seconds)
+    if (s.recorded_at >= recentCut) e.recent = e.recent == null ? v : Math.min(e.recent, v)
+    else e.base = e.base == null ? v : Math.min(e.base, v)
+  }
+  const best = new Map() // studentId -> best improvement row
+  for (const [key, e] of byKey) {
+    if (e.recent == null || e.base == null) continue
+    const delta = e.base - e.recent
+    if (delta <= 0) continue
+    const [sid, project] = key.split('|')
+    const cur = best.get(sid)
+    if (!cur || delta > cur.delta) best.set(sid, { sid, project, delta, recent: e.recent, base: e.base })
+  }
+  const studentMap = new Map(filteredStudents.value.map((s) => [s.id, s]))
+  return [...best.values()]
+    .map((r) => ({ student: studentMap.get(r.sid), ...r }))
+    .filter((r) => r.student)
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, 5)
+})
+
+/** 待关注：超过 30 天未测试（含从未测试）的学员 */
+const attentionList = computed(() => {
+  const ok = studentIdSet.value
+  const last = new Map()
+  for (const s of allScores.value) {
+    if (!ok.has(s.student_id)) continue
+    const d = s.recorded_at
+    if (d && (!last.has(s.student_id) || d > last.get(s.student_id))) last.set(s.student_id, d)
+  }
+  return filteredStudents.value
+    .map((st) => {
+      const d = last.get(st.id) || null
+      const days = d ? Math.floor((todayMs - new Date(d).getTime()) / 86400000) : null
+      return { student: st, lastDate: d, days }
+    })
+    .filter((r) => r.days == null || r.days >= RECENT_DAYS)
+    .sort((a, b) => (b.days ?? 9999) - (a.days ?? 9999))
+    .slice(0, 8)
+})
 
 function goStudent(id) {
   router.push({ name: 'student-detail', params: { id } })

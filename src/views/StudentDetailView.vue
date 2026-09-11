@@ -9,6 +9,10 @@
         <template #icon><ArrowLeft class="size-3.5" /></template>
         返回
       </UiButton>
+      <UiButton variant="outline" @click="exportReport">
+        <template #icon><FileText class="size-3.5" /></template>
+        成长报告
+      </UiButton>
       <UiButton v-if="canManageStudent" variant="outline" @click="openStudentEdit">
         <template #icon><UserCog class="size-4" /></template>
         编辑资料
@@ -94,6 +98,45 @@
           <span class="size-2 rounded-sm" :style="{ backgroundColor: project === p.value ? 'rgba(255,255,255,.85)' : p.color }" />
           {{ p.label }}
         </button>
+      </div>
+
+      <!-- 训练目标 -->
+      <div class="fc-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-900">
+            <Target class="size-4 text-brand-500" />训练目标
+            <span class="ml-1 text-[12px] font-normal text-ink-400">{{ cubeMeta?.label }}</span>
+          </h3>
+          <div class="flex items-center gap-2">
+            <UiButton v-if="canManageGoals && goalState.has" variant="ghost" size="sm" @click="removeGoal">删除</UiButton>
+            <UiButton v-if="canManageGoals" variant="outline" size="sm" @click="openGoalEdit">
+              {{ goalState.has ? '编辑目标' : '设置目标' }}
+            </UiButton>
+          </div>
+        </div>
+
+        <template v-if="goalState.has">
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-600">
+            <span>{{ goalState.detail }}</span>
+            <span v-if="currentGoal?.due" class="text-ink-400">截止 {{ formatDate(currentGoal.due) }}</span>
+            <span
+              class="rounded-md px-1.5 py-0.5 text-[11px] font-semibold"
+              :class="goalState.achieved ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'"
+            >{{ goalState.achieved ? '已达成' : '进行中' }}</span>
+          </div>
+          <div class="mt-2.5 h-2 overflow-hidden rounded-full bg-ink-100">
+            <div
+              class="h-full rounded-full transition-all"
+              :class="goalState.achieved ? 'bg-emerald-500' : 'bg-brand-500'"
+              :style="{ width: Math.round(goalState.pct * 100) + '%' }"
+            />
+          </div>
+          <p class="mt-1.5 text-[11.5px] text-ink-400">完成度 {{ Math.round(goalState.pct * 100) }}%</p>
+          <p v-if="currentGoal?.note" class="mt-1 text-[12px] text-ink-500">{{ currentGoal.note }}</p>
+        </template>
+        <p v-else class="mt-3 text-[12.5px] text-ink-400">
+          {{ canManageGoals ? '尚未为该项目设置训练目标，点击「设置目标」开始。' : '尚未为该项目设置训练目标。' }}
+        </p>
       </div>
 
       <!-- 统计卡片 -->
@@ -469,6 +512,59 @@
         <UiButton variant="primary" :loading="studentSaving" @click="saveStudent">保存</UiButton>
       </template>
     </UiModal>
+
+    <!-- 训练目标 -->
+    <UiModal :open="goalOpen" title="设置训练目标" width="sm" @close="goalOpen = false">
+      <div class="space-y-4">
+        <UiField label="魔方项目">
+          <input class="fc-input" :value="cubeMeta?.label" disabled />
+        </UiField>
+        <UiField label="目标类型">
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium transition"
+              :class="goalForm.type === 'time' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-ink-200 text-ink-600'"
+              @click="goalForm.type = 'time'"
+            >
+              成绩目标
+            </button>
+            <button
+              type="button"
+              class="flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium transition"
+              :class="goalForm.type === 'rank' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-ink-200 text-ink-600'"
+              @click="goalForm.type = 'rank'"
+            >
+              段位目标
+            </button>
+          </div>
+        </UiField>
+        <template v-if="goalForm.type === 'time'">
+          <UiField label="目标平均成绩（秒）" required>
+            <input v-model="goalForm.target" type="number" step="0.01" min="0" class="fc-input" placeholder="例：20" />
+          </UiField>
+          <UiField label="起始成绩（秒）" hint="用于计算进度，默认取当前最佳平均">
+            <input v-model="goalForm.baseline" type="number" step="0.01" min="0" class="fc-input" />
+          </UiField>
+        </template>
+        <UiField v-else label="目标段位" required>
+          <select v-model="goalForm.target" class="fc-input">
+            <option value="">请选择</option>
+            <option v-for="t in rankTiers(project)" :key="t.key" :value="t.key">{{ t.label }}（≤ {{ t.max }}s）</option>
+          </select>
+        </UiField>
+        <UiField label="截止日期">
+          <input v-model="goalForm.due" type="date" class="fc-input" />
+        </UiField>
+        <UiField label="备注">
+          <input v-model="goalForm.note" class="fc-input" placeholder="例：暑期集训前达成" />
+        </UiField>
+      </div>
+      <template #footer>
+        <UiButton variant="outline" @click="goalOpen = false">取消</UiButton>
+        <UiButton variant="primary" :loading="goalSaving" @click="saveGoal">保存目标</UiButton>
+      </template>
+    </UiModal>
   </div>
 </template>
 
@@ -479,11 +575,13 @@ import {
   ArrowLeft,
   CalendarClock,
   Download,
+  FileText,
   FolderOpen,
   ListChecks,
   Medal,
   Pencil,
   Plus,
+  Target,
   Timer,
   Trash2,
   TrendingUp,
@@ -518,6 +616,8 @@ import {
   computeAo5,
 } from '@/api/scores'
 import { listResourcesByTag } from '@/api/resources'
+import { loadGoals, saveGoals } from '@/api/goals'
+import { getSetting } from '@/api/settings'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
@@ -545,6 +645,13 @@ const relatedLoading = ref(false)
 
 const canViewResources = computed(() => auth.can('resource.view'))
 
+// 训练目标
+const canManageGoals = computed(() => auth.can('settings.manage'))
+const goals = ref({})
+const goalOpen = ref(false)
+const goalSaving = ref(false)
+const goalForm = reactive({ type: 'time', target: '', baseline: '', due: '', note: '' })
+
 const cubeMeta = computed(() => CUBE_PROJECTS.find((p) => p.value === project.value) || null)
 const today = new Date().toISOString().slice(0, 10)
 
@@ -559,6 +666,52 @@ const ranks = computed(() => {
     const next = idx >= 0 && idx < tiers.length - 1 ? tiers[idx + 1] : null
     return { ...p, bestAvg: best, rank, next }
   })
+})
+
+// ===== 训练目标进度 =====
+const currentGoal = computed(() => {
+  const sid = student.value?.id
+  if (!sid) return null
+  return goals.value[sid]?.[project.value] || null
+})
+
+const goalState = computed(() => {
+  const g = currentGoal.value
+  const cur = bests.value?.[project.value]?.bestAvg ?? null
+  if (!g) return { has: false, current: cur, pct: 0, achieved: false, detail: '' }
+
+  if (g.type === 'rank') {
+    const tiers = rankTiers(project.value)
+    const targetIdx = tiers.findIndex((t) => t.key === g.target)
+    const curRank = rankForProject(project.value, cur)
+    const curIdx = curRank ? tiers.findIndex((t) => t.key === curRank.key) : -1
+    const achieved = cur != null && targetIdx >= 0 && curIdx >= targetIdx
+    const pct = achieved ? 1 : targetIdx >= 0 ? Math.max(0, Math.min(1, (curIdx + 1) / (targetIdx + 1))) : 0
+    const tl = tiers.find((t) => t.key === g.target)
+    return {
+      has: true,
+      current: cur,
+      pct,
+      achieved,
+      detail: curRank ? `当前段位 ${curRank.label} · 目标 ${tl?.label || '—'}` : `目标段位 ${tl?.label || '—'}`,
+    }
+  }
+
+  const target = Number(g.target)
+  const base = g.baseline != null && g.baseline !== '' ? Number(g.baseline) : cur
+  const achieved = cur != null && target > 0 && cur <= target
+  let pct = 0
+  if (achieved) pct = 1
+  else if (base != null && cur != null && base > target && target > 0) {
+    pct = Math.max(0, Math.min(1, (base - cur) / (base - target)))
+  }
+  return {
+    has: true,
+    current: cur,
+    pct,
+    achieved,
+    detail: cur != null ? `当前 ${cur.toFixed(2)}s · 目标 ${target.toFixed(2)}s` : `目标 ${target.toFixed(2)}s`,
+  }
 })
 
 function ageOf(birthday) {
@@ -1019,7 +1172,7 @@ async function load() {
   loading.value = true
   try {
     student.value = await getStudent(route.params.id)
-    if (student.value) await Promise.all([loadProject(), loadBests()])
+    if (student.value) await Promise.all([loadProject(), loadBests(), loadGoalsList()])
   } catch (err) {
     toast.error(err.message)
   } finally {
@@ -1049,6 +1202,217 @@ async function loadRelated() {
   } finally {
     relatedLoading.value = false
   }
+}
+
+// ===== 训练目标：读取 / 编辑 =====
+async function loadGoalsList() {
+  try {
+    goals.value = await loadGoals()
+  } catch {
+    goals.value = {}
+  }
+}
+
+function openGoalEdit() {
+  const g = currentGoal.value
+  const cur = bests.value?.[project.value]?.bestAvg ?? null
+  Object.assign(goalForm, {
+    type: g?.type || 'time',
+    target: g ? String(g.target) : '',
+    baseline: g?.baseline != null ? String(g.baseline) : cur != null ? cur.toFixed(2) : '',
+    due: g?.due || '',
+    note: g?.note || '',
+  })
+  goalOpen.value = true
+}
+
+async function persistGoals(next) {
+  await saveGoals(next)
+  goals.value = next
+}
+
+async function saveGoal() {
+  const type = goalForm.type
+  const rawTarget = String(goalForm.target ?? '').trim()
+  if (!rawTarget) {
+    toast.error('请填写目标值')
+    return
+  }
+  const goal = {
+    type,
+    target: type === 'time' ? Number(rawTarget) : rawTarget,
+    baseline: goalForm.baseline !== '' ? Number(goalForm.baseline) : null,
+    due: goalForm.due || null,
+    note: goalForm.note?.trim() || null,
+  }
+  if (type === 'time' && !(goal.target > 0)) {
+    toast.error('目标成绩需大于 0')
+    return
+  }
+  goalSaving.value = true
+  try {
+    const next = JSON.parse(JSON.stringify(goals.value))
+    const sid = student.value.id
+    next[sid] = next[sid] || {}
+    next[sid][project.value] = goal
+    await persistGoals(next)
+    goalOpen.value = false
+    toast.success('目标已保存')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    goalSaving.value = false
+  }
+}
+
+async function removeGoal() {
+  const sid = student.value.id
+  if (!goals.value[sid]?.[project.value]) return
+  const ok = await dialog.confirm({
+    title: '删除目标',
+    message: '确认删除该项目下的训练目标吗？',
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  goalSaving.value = true
+  try {
+    const next = JSON.parse(JSON.stringify(goals.value))
+    delete next[sid][project.value]
+    if (!Object.keys(next[sid]).length) delete next[sid]
+    await persistGoals(next)
+    goalOpen.value = false
+    toast.success('目标已删除')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    goalSaving.value = false
+  }
+}
+
+/** 生成可打印的学员成长报告（浏览器打印 → 另存为 PDF，方便发家长） */
+async function exportReport() {
+  const st = student.value
+  if (!st) return
+
+  let brand = { name: '风驰思维魔方' }
+  let contact = {}
+  try {
+    brand = { ...brand, ...(await getSetting('site.brand', {})) }
+    contact = (await getSetting('site.contact', {})) || {}
+  } catch {
+    // 使用默认品牌信息
+  }
+
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const fmt = (v) => (v == null ? '—' : Number(v).toFixed(2) + 's')
+  const fmtRow = (v, dnf) => (dnf ? 'DNF' : v == null ? '—' : Number(v).toFixed(2))
+
+  const rankCards = ranks.value
+    .map((r) => {
+      const single = bests.value?.[r.value]?.bestSingle ?? null
+      return `<div class="card"${r.rank ? ` style="border-color:${r.rank.color}66"` : ''}>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b>${esc(r.label)}</b>
+          ${r.rank ? `<span class="rank" style="background:${r.rank.color}">${esc(r.rank.label)}</span>` : '<span class="muted">未达标</span>'}
+        </div>
+        <div class="line">最佳平均 <b>${fmt(r.bestAvg)}</b></div>
+        <div class="line">最佳单次 <b>${fmt(single)}</b></div>
+      </div>`
+    })
+    .join('')
+
+  const recent = scores.value.slice(0, 12)
+  const rows = recent.length
+    ? recent
+        .map(
+          (s) => `<tr>
+        <td>${esc(formatDate(s.recorded_at))}</td>
+        <td>${fmtRow(s.avg_seconds, s.avg_is_dnf)}</td>
+        <td>${fmtRow(s.single_best_seconds, s.single_is_dnf)}</td>
+        <td>${s.mode === 'detail' ? '详细' : '简单'}</td>
+        <td>${esc(s.note || '')}</td>
+      </tr>`,
+        )
+        .join('')
+    : '<tr><td colspan="5" style="text-align:center;color:#9aa0a6;">暂无成绩记录</td></tr>'
+
+  const contactLine = [
+    contact.phone && `电话 ${contact.phone}`,
+    contact.wechat && `微信 ${contact.wechat}`,
+    contact.address && `地址 ${contact.address}`,
+    contact.hours,
+  ]
+    .filter(Boolean)
+    .join('　')
+
+  const genderMap = { male: '男', female: '女', unknown: '未填写' }
+  const generated = new Date().toLocaleString('zh-CN')
+
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" />
+<title>${esc(st.name)}成长报告</title>
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#1f2937;margin:0;padding:34px;}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #EA625F;padding-bottom:12px;margin-bottom:18px;}
+  h1{font-size:22px;margin:0 0 4px;}
+  .sub,.muted{color:#9aa0a6;font-size:12px;}
+  .brand{font-weight:700;color:#EA625F;font-size:14px;text-align:right;}
+  .meta{font-size:13px;color:#4b5563;line-height:2;margin-bottom:18px;}
+  .meta b{color:#111827;}
+  h2{font-size:14px;margin:22px 0 10px;padding-left:8px;border-left:3px solid #EA625F;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .card{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;}
+  .card .line{font-size:12px;color:#4b5563;margin-top:4px;}
+  .rank{display:inline-block;padding:1px 6px;border-radius:4px;color:#fff;font-size:11px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;}
+  th{background:#f9fafb;color:#6b7280;font-weight:500;}
+  .foot{margin-top:26px;font-size:11.5px;color:#9aa0a6;border-top:1px solid #e5e7eb;padding-top:10px;}
+  @media print{body{padding:0;} @page{margin:14mm;}}
+</style></head><body>
+  <div class="head">
+    <div>
+      <h1>学员成长报告</h1>
+      <div class="sub">生成时间：${esc(generated)}</div>
+    </div>
+    <div class="brand">${esc(brand.name || '')}</div>
+  </div>
+
+  <div class="meta">
+    <div><b>姓名：</b>${esc(st.name)}${st.nickname ? ' <span class="muted">（' + esc(st.nickname) + '）</span>' : ''}</div>
+    <div><b>性别：</b>${genderMap[st.gender] || '—'}　　<b>年龄：</b>${esc(ageOf(st.birthday))}　　<b>当前水平：</b>${esc(st.level || '—')}</div>
+    <div><b>家长：</b>${esc(st.guardian_name || '—')}　　<b>加入日期：</b>${esc(formatDate(st.joined_at))}</div>
+  </div>
+
+  <h2>魔方段位与最好成绩</h2>
+  <div class="grid">${rankCards}</div>
+
+  <h2>${esc(cubeMeta.value?.label || '')} · 近期成绩</h2>
+  <table>
+    <thead><tr><th>日期</th><th>平均成绩(秒)</th><th>单次最佳(秒)</th><th>模式</th><th>备注</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="foot">${contactLine ? esc(contactLine) : '　'}</div>
+</body></html>`
+
+  const w = window.open('', '_blank')
+  if (!w) {
+    toast.error('浏览器拦截了新窗口，请允许弹窗后重试')
+    return
+  }
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => {
+    try {
+      w.print()
+    } catch {
+      // 用户仍可手动打印
+    }
+  }, 500)
 }
 
 watch(

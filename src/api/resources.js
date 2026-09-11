@@ -214,6 +214,39 @@ export async function updateResource(id, payload) {
   return data
 }
 
+/** 判断是否为「外部链接型资源」（bucket='link'，file_path 存外部 URL） */
+export function isLinkResource(resource) {
+  return resource?.bucket === 'link'
+}
+
+/**
+ * 新增「外部链接型资源」：不占 Storage，仅登记外部地址（如 B 站 / 腾讯云点播）。
+ * 约定：bucket='link'，file_path 存放外部 URL。
+ */
+export async function createLinkResource(meta = {}) {
+  const { data: auth } = await supabase.auth.getUser()
+  const url = String(meta.url || '').trim()
+  const row = {
+    title: meta.title?.trim() || url,
+    description: meta.description || null,
+    category_id: meta.category_id || null,
+    course_id: meta.course_id || null,
+    bucket: 'link',
+    file_path: url,
+    file_name: url,
+    file_size: 0,
+    mime_type: null,
+    file_type: meta.file_type || 'other',
+    version: meta.version || null,
+    tags: meta.tags || [],
+    visibility: meta.visibility || 'internal',
+    uploaded_by: auth?.user?.id ?? null,
+  }
+  const { data, error } = await supabase.from(TABLES.resources).insert(row).select().single()
+  if (error) throw new Error(errorMessage(error, '保存链接资源失败'))
+  return data
+}
+
 /** 替换文件内容（保留资源记录，仅换存储对象） */
 export async function replaceResourceFile(resource, file) {
   const uid = resource.uploaded_by || (await supabase.auth.getUser()).data?.user?.id || 'anonymous'
@@ -250,16 +283,21 @@ export async function replaceResourceFile(resource, file) {
 export async function deleteResource(resource) {
   const { error } = await supabase.from(TABLES.resources).delete().eq('id', resource.id)
   if (error) throw new Error(errorMessage(error, '删除资源失败'))
-  if (resource.file_path) {
+  // 链接型资源没有存储对象，跳过 Storage 删除
+  if (resource.file_path && resource.bucket !== 'link') {
     await supabase.storage.from(BUCKETS.resources).remove([resource.file_path])
   }
 }
 
 /**
  * 生成限时下载链接并登记下载记录
- * resource 桶为私有桶，下载地址有效期 5 分钟
+ * resource 桶为私有桶，下载地址有效期 5 分钟；链接型资源直接返回外部地址。
  */
 export async function downloadResource(resource) {
+  if (resource.bucket === 'link') {
+    supabase.rpc('register_download', { p_resource_id: resource.id }).then(() => {})
+    return resource.file_path
+  }
   const { data, error } = await supabase.storage
     .from(resource.bucket || BUCKETS.resources)
     .createSignedUrl(resource.file_path, 300, { download: resource.file_name })
@@ -271,8 +309,9 @@ export async function downloadResource(resource) {
   return data.signedUrl
 }
 
-/** 预览链接（内联显示，不强制下载） */
+/** 预览链接（内联显示，不强制下载）；链接型资源直接返回外部地址 */
 export async function previewUrl(resource) {
+  if (resource.bucket === 'link') return resource.file_path
   const { data, error } = await supabase.storage
     .from(resource.bucket || BUCKETS.resources)
     .createSignedUrl(resource.file_path, 300)

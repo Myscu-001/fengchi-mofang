@@ -133,7 +133,7 @@
                 v-for="res in resources"
                 :key="res.id"
                 class="fc-card group flex cursor-pointer flex-col p-4 transition hover:shadow-lift"
-                @click="openPreview(res)"
+                @click="openResource(res)"
               >
                 <div class="flex items-start gap-3">
                   <ResourceIcon :kind="res.file_type" />
@@ -169,6 +169,11 @@
 
                 <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
                   <UiBadge
+                    v-if="isLinkResource(res)"
+                    label="链接"
+                    custom-class="bg-sky-50 text-sky-600 border-sky-200"
+                  />
+                  <UiBadge
                     v-for="vp in projectTags(res)"
                     :key="vp.value"
                     :label="vp.label"
@@ -194,7 +199,7 @@
                 </div>
 
                 <div class="mt-2.5 flex items-center gap-3 text-[11.5px] text-ink-400">
-                  <span>{{ formatFileSize(res.file_size) }}</span>
+                  <span>{{ isLinkResource(res) ? '外部链接' : formatFileSize(res.file_size) }}</span>
                   <span>{{ formatDate(res.created_at) }}</span>
                   <span class="inline-flex items-center gap-0.5">
                     <Download class="size-3" />{{ res.download_count }}
@@ -205,13 +210,27 @@
                   <UiButton
                     variant="outline"
                     size="sm"
-                    title="预览"
-                    @click.stop="openPreview(res)"
+                    :title="isLinkResource(res) ? '打开链接' : '预览'"
+                    @click.stop="openResource(res)"
                   >
-                    <template #icon><Eye class="size-3.5" /></template>
-                    预览
+                    <template #icon>
+                      <ExternalLink v-if="isLinkResource(res)" class="size-3.5" />
+                      <Eye v-else class="size-3.5" />
+                    </template>
+                    {{ isLinkResource(res) ? '打开' : '预览' }}
                   </UiButton>
                   <UiButton
+                    v-if="isLinkResource(res)"
+                    variant="secondary"
+                    size="sm"
+                    block
+                    @click.stop="copyLink(res)"
+                  >
+                    <template #icon><Copy class="size-3.5" /></template>
+                    复制链接
+                  </UiButton>
+                  <UiButton
+                    v-else
                     variant="primary"
                     size="sm"
                     block
@@ -254,8 +273,40 @@
       @close="formOpen = false"
     >
       <div class="space-y-4">
-        <!-- 拖拽区（仅上传时显示） -->
-        <div v-if="!editing">
+        <!-- 资源来源切换（仅新增时可选） -->
+        <div v-if="!editing" class="flex rounded-lg bg-ink-100 p-0.5">
+          <button
+            type="button"
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-medium transition"
+            :class="form.mode === 'file' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+            @click="form.mode = 'file'"
+          >
+            <Upload class="size-3.5" />上传文件
+          </button>
+          <button
+            type="button"
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-medium transition"
+            :class="form.mode === 'link' ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+            @click="form.mode = 'link'"
+          >
+            <Link2 class="size-3.5" />外部链接
+          </button>
+        </div>
+
+        <!-- 外部链接（不占存储，适合视频等大文件） -->
+        <template v-if="form.mode === 'link'">
+          <UiField label="外部链接地址" required hint="视频建议用 B站 / 腾讯云点播等外部地址，不占用本系统存储">
+            <input v-model="form.linkUrl" class="fc-input" placeholder="https://…" />
+          </UiField>
+          <UiField label="链接类型">
+            <select v-model="form.linkType" class="fc-input">
+              <option v-for="o in FILE_KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </UiField>
+        </template>
+
+        <!-- 拖拽区（仅上传文件时显示） -->
+        <div v-if="!editing && form.mode === 'file'">
           <div
             class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-7 text-center transition"
             :class="
@@ -365,8 +416,8 @@
 
       <template #footer>
         <UiButton variant="outline" @click="formOpen = false">取消</UiButton>
-        <UiButton variant="primary" :loading="saving" :disabled="!editing && !selectedFile" @click="submit">
-          {{ editing ? '保存修改' : '上传' }}
+        <UiButton variant="primary" :loading="saving" :disabled="!canSubmit" @click="submit">
+          {{ editing ? '保存修改' : form.mode === 'link' ? '添加链接' : '上传' }}
         </UiButton>
       </template>
     </UiModal>
@@ -469,6 +520,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   Check,
+  Copy,
   Download,
   ExternalLink,
   Eye,
@@ -476,6 +528,7 @@ import {
   FolderCog,
   FolderOpen,
   LayoutGrid,
+  Link2,
   Pencil,
   Plus,
   RotateCcw,
@@ -503,6 +556,8 @@ import {
   listResources,
   listTagStats,
   uploadResource,
+  createLinkResource,
+  isLinkResource,
   updateResource,
   deleteResource,
   downloadResource,
@@ -603,6 +658,16 @@ const form = reactive({
   version: '',
   visibility: 'internal',
   projects: [],
+  mode: 'file', // 'file' | 'link'
+  linkUrl: '',
+  linkType: 'video',
+})
+
+const canSubmit = computed(() => {
+  if (saving.value) return false
+  if (editing.value) return true
+  if (form.mode === 'link') return /^https?:\/\//i.test(form.linkUrl?.trim() || '')
+  return !!selectedFile.value
 })
 
 async function loadCategories() {
@@ -713,6 +778,9 @@ function openUpload() {
     version: '',
     visibility: 'internal',
     projects: [],
+    mode: 'file',
+    linkUrl: '',
+    linkType: 'video',
   })
   formOpen.value = true
 }
@@ -733,6 +801,9 @@ function openEdit(res) {
     version: res.version || '',
     visibility: res.visibility || 'internal',
     projects: [...projects],
+    mode: isLinkResource(res) ? 'link' : 'file',
+    linkUrl: isLinkResource(res) ? res.file_path : '',
+    linkType: isLinkResource(res) ? res.file_type : 'video',
   })
   formOpen.value = true
 }
@@ -762,6 +833,14 @@ function pickFile(file) {
 
 async function submit() {
   formError.value = ''
+  const isLinkMode = form.mode === 'link'
+  const linkUrl = form.linkUrl?.trim() || ''
+
+  if (isLinkMode && !/^https?:\/\//i.test(linkUrl)) {
+    formError.value = '请填写以 http:// 或 https:// 开头的有效链接'
+    return
+  }
+
   const payload = {
     title: form.title?.trim(),
     description: form.description?.trim() || null,
@@ -783,8 +862,20 @@ async function submit() {
   progress.value = 0
   try {
     if (editing.value) {
-      await updateResource(editing.value.id, payload)
+      const patch = { ...payload }
+      if (isLinkMode) {
+        // 链接型资源：把外部地址写回 file_path
+        patch.bucket = 'link'
+        patch.file_path = linkUrl
+        patch.file_name = linkUrl
+        patch.file_type = form.linkType
+        patch.file_size = 0
+      }
+      await updateResource(editing.value.id, patch)
       toast.success('资源信息已保存')
+    } else if (isLinkMode) {
+      await createLinkResource({ ...payload, url: linkUrl, file_type: form.linkType })
+      toast.success('链接资源已添加')
     } else {
       await uploadResource(selectedFile.value, payload, (p) => {
         progress.value = p
@@ -833,6 +924,24 @@ async function download(res) {
 
 function fileExt(name = '') {
   return (name.split('.').pop() || '').toLowerCase()
+}
+
+/** 统一入口：链接型资源直接打开外部地址，文件型资源走站内预览 */
+function openResource(res) {
+  if (isLinkResource(res)) {
+    window.open(res.file_path, '_blank', 'noopener')
+    return
+  }
+  openPreview(res)
+}
+
+async function copyLink(res) {
+  try {
+    await navigator.clipboard.writeText(res.file_path)
+    toast.success('链接已复制')
+  } catch {
+    toast.error('复制失败，请手动复制')
+  }
 }
 
 const AUDIO_EXTS = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac']
