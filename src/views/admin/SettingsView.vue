@@ -256,6 +256,51 @@
             </div>
           </div>
         </section>
+
+        <!-- 错误监控 -->
+        <section class="fc-card p-5">
+          <header class="flex items-center justify-between border-b border-ink-200 pb-3.5">
+            <h2 class="flex items-center gap-2 text-[15px] font-semibold text-ink-900">
+              <Activity class="size-4 text-brand-500" />错误监控
+            </h2>
+            <UiButton size="sm" variant="outline" :loading="savingKey === 'monitor.config'" @click="saveOne('monitor.config')">
+              保存本节
+            </UiButton>
+          </header>
+          <p class="mt-3 text-[12.5px] text-ink-500">
+            开启后，页面运行错误（Vue 报错、未捕获异常、未处理的 Promise）会自动记录，并可推送到群机器人。
+            本地日志可在「个人中心 → 诊断日志」查看与复制，方便反馈问题。
+          </p>
+
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <UiField label="启用错误记录与上报">
+              <select v-model="monitor.enabled" class="fc-input">
+                <option :value="true">启用</option>
+                <option :value="false">关闭</option>
+              </select>
+            </UiField>
+            <UiField label="机器人类型">
+              <select v-model="monitor.format" class="fc-input">
+                <option value="wecom">企业微信群机器人</option>
+                <option value="dingtalk">钉钉群机器人</option>
+                <option value="feishu">飞书群机器人</option>
+                <option value="generic">通用 JSON 接口</option>
+              </select>
+            </UiField>
+            <div class="sm:col-span-2">
+              <UiField label="群机器人 Webhook 地址" hint="留空则只记录到本地、不推送">
+                <input
+                  v-model="monitor.webhook"
+                  class="fc-input"
+                  placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=…"
+                />
+              </UiField>
+            </div>
+          </div>
+          <p class="mt-2 text-[11.5px] text-amber-600">
+            提示：Webhook 会随前端一起下发，相当于公开地址；仅用于内部告警，请勿填入含敏感权限的接口。
+          </p>
+        </section>
       </div>
     </div>
   </div>
@@ -264,6 +309,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import {
+  Activity,
   Award,
   BookOpen,
   House,
@@ -282,6 +328,7 @@ import UiLoading from '@/components/UiLoading.vue'
 import { listSettings, saveSetting } from '@/api/settings'
 import { CUBE_PROJECTS } from '@/lib/dict'
 import { ensureRanksLoaded, saveRanks, DEFAULT_RANKS } from '@/lib/ranks'
+import { loadMonitorConfig } from '@/lib/monitor'
 import { useToastStore } from '@/stores/toast'
 
 const toast = useToastStore()
@@ -297,6 +344,7 @@ const about = reactive({ title: '', content: '' })
 const highlights = ref([])
 const baseline = reactive({ students: 0, coaches: 0, lessons: 0, years: 0 })
 const ranks = reactive({})
+const monitor = reactive({ enabled: true, webhook: '', format: 'wecom' })
 
 function buildLocalRanks(src) {
   for (const p of CUBE_PROJECTS) {
@@ -314,6 +362,7 @@ async function load() {
     Object.assign(about, map['home.about'] || {})
     highlights.value = map['home.highlights']?.items || []
     Object.assign(baseline, map['stats.baseline'] || {})
+    Object.assign(monitor, map['monitor.config'] || {})
     buildLocalRanks(await ensureRanksLoaded())
   } catch (err) {
     toast.error(err.message)
@@ -352,6 +401,7 @@ async function saveOne(key) {
   savingKey.value = key
   try {
     await saveSetting(key, buildValue(key))
+    if (key === 'monitor.config') await loadMonitorConfig()
     toast.success('已保存')
   } catch (err) {
     toast.error(err.message)
@@ -362,10 +412,10 @@ async function saveOne(key) {
 
 async function saveAll() {
   savingAll.value = true
-  const keys = ['site.brand', 'site.contact', 'home.hero', 'home.about', 'home.highlights', 'stats.baseline', 'cube.ranks']
+  const keys = ['site.brand', 'site.contact', 'home.hero', 'home.about', 'home.highlights', 'stats.baseline', 'cube.ranks', 'monitor.config']
   try {
     await Promise.all(keys.map((key) => saveSetting(key, buildValue(key))))
-    await ensureRanksLoaded()
+    await Promise.all([ensureRanksLoaded(), loadMonitorConfig()])
     toast.success('站点配置已全部保存')
   } catch (err) {
     toast.error(err.message)
@@ -395,6 +445,12 @@ function buildValue(key) {
       }
     case 'cube.ranks':
       return JSON.parse(JSON.stringify(ranks))
+    case 'monitor.config':
+      return {
+        enabled: monitor.enabled !== false,
+        webhook: monitor.webhook?.trim() || '',
+        format: monitor.format || 'wecom',
+      }
     default:
       return {}
   }

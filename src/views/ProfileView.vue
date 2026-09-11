@@ -145,6 +145,36 @@
               <li>· 如怀疑账号泄露，请立即修改密码并联系超级管理员。</li>
             </ul>
           </div>
+
+          <div class="fc-card p-5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-[15px] font-semibold text-ink-900">诊断日志</h3>
+              <UiBadge
+                v-if="errorLogs.length"
+                :label="`${errorLogs.length} 条`"
+                custom-class="bg-red-50 text-red-600 border-red-200"
+              />
+            </div>
+            <p class="mt-1 text-[12px] text-ink-500">记录本机最近的前端报错，反馈问题时可直接复制给管理员。</p>
+
+            <div v-if="errorLogs.length" class="mt-3 space-y-2">
+              <div v-for="(e, i) in errorLogs.slice(0, 3)" :key="i" class="rounded-lg bg-ink-50 p-2.5 text-[11.5px]">
+                <p class="line-clamp-1 font-medium text-ink-700">{{ e.message }}</p>
+                <p class="mt-0.5 text-ink-400">{{ e.time }}</p>
+              </div>
+              <div class="flex items-center gap-2 pt-1">
+                <UiButton size="sm" variant="outline" @click="copyLogs">
+                  <template #icon><Copy class="size-3.5" /></template>
+                  复制全部
+                </UiButton>
+                <UiButton size="sm" variant="ghost" @click="clearLogs">
+                  <template #icon><Trash2 class="size-3.5 text-red-500" /></template>
+                  清空
+                </UiButton>
+              </div>
+            </div>
+            <p v-else class="mt-3 text-[12.5px] text-ink-400">暂无错误记录，一切正常。</p>
+          </div>
         </aside>
       </div>
     </div>
@@ -153,7 +183,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Eye, EyeOff, Upload } from 'lucide-vue-next'
+import { Check, Copy, Eye, EyeOff, Trash2, Upload } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
@@ -164,6 +194,7 @@ import { useToastStore } from '@/stores/toast'
 import { roleLabel, roleStyle } from '@/lib/permissions'
 import { formatDate, relativeTime } from '@/lib/format'
 import { listPermissions } from '@/api/users'
+import { listErrors, clearErrors } from '@/lib/monitor'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -175,6 +206,7 @@ const savedAt = ref('')
 const showPwd = ref(false)
 const pwdError = ref('')
 const allPermissions = ref([])
+const errorLogs = ref([])
 
 const profileForm = reactive({ full_name: '', title: '', phone: '', bio: '' })
 const pwdForm = reactive({ password: '', confirm: '' })
@@ -205,7 +237,28 @@ onMounted(async () => {
   } catch {
     allPermissions.value = []
   }
+
+  errorLogs.value = listErrors()
 })
+
+function copyLogs() {
+  const text = errorLogs.value
+    .map(
+      (e, i) =>
+        `#${i + 1} ${e.time}\n页面：${e.route}\n信息：${e.message}\n${e.info ? '位置：' + e.info + '\n' : ''}${e.stack || ''}`,
+    )
+    .join('\n\n')
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success('诊断日志已复制'))
+    .catch(() => toast.error('复制失败，请手动选择文本'))
+}
+
+function clearLogs() {
+  clearErrors()
+  errorLogs.value = []
+  toast.success('诊断日志已清空')
+}
 
 async function handleAvatar(event) {
   const file = event.target.files?.[0]
