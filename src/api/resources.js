@@ -61,7 +61,7 @@ export async function categoryCounts() {
 // 资源列表
 // ---------------------------------------------------------------------------
 const RESOURCE_SELECT = `
-  id, title, description, file_name, file_path, file_size, mime_type, file_type,
+  id, title, description, bucket, file_name, file_path, file_size, mime_type, file_type,
   version, tags, visibility, download_count, created_at, updated_at,
   category_id, course_id,
   category:resource_categories(id, name, color, icon),
@@ -216,7 +216,10 @@ export async function updateResource(id, payload) {
 
 /** 判断是否为「外部链接型资源」（bucket='link'，file_path 存外部 URL） */
 export function isLinkResource(resource) {
-  return resource?.bucket === 'link'
+  if (!resource) return false
+  if (resource.bucket === 'link') return true
+  // 兜底：若查询未返回 bucket，但 file_path 已是 http(s) 地址，也按外部链接处理
+  return /^https?:\/\//i.test(resource.file_path || '')
 }
 
 /**
@@ -294,7 +297,7 @@ export async function deleteResource(resource) {
  * resource 桶为私有桶，下载地址有效期 5 分钟；链接型资源直接返回外部地址。
  */
 export async function downloadResource(resource) {
-  if (resource.bucket === 'link') {
+  if (isLinkResource(resource)) {
     supabase.rpc('register_download', { p_resource_id: resource.id }).then(() => {})
     return resource.file_path
   }
@@ -311,7 +314,7 @@ export async function downloadResource(resource) {
 
 /** 预览链接（内联显示，不强制下载）；链接型资源直接返回外部地址 */
 export async function previewUrl(resource) {
-  if (resource.bucket === 'link') return resource.file_path
+  if (isLinkResource(resource)) return resource.file_path
   const { data, error } = await supabase.storage
     .from(resource.bucket || BUCKETS.resources)
     .createSignedUrl(resource.file_path, 300)
