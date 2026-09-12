@@ -64,6 +64,7 @@ export const TABLES = {
   downloads: 'resource_downloads',
   coaches: 'coaches',
   siteSettings: 'site_settings',
+  auditLogs: 'audit_logs',
 }
 
 export const BUCKETS = {

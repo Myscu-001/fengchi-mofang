@@ -162,6 +162,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  ScrollText,
   Settings,
   ShieldCheck,
   UserCog,
@@ -205,6 +206,7 @@ const adminDefs = [
   { to: { name: 'admin-roles' }, label: '角色权限', icon: ShieldCheck, perm: 'role.manage' },
   { to: { name: 'admin-coaches' }, label: '师资团队', icon: Award, perm: 'coach.manage' },
   { to: { name: 'admin-settings' }, label: '站点配置', icon: Settings, perm: 'settings.manage' },
+  { to: { name: 'admin-audit' }, label: '操作日志', icon: ScrollText, perm: 'user.manage' },
 ]
 
 const navItems = computed(() =>

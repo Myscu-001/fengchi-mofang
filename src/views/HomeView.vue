@@ -108,8 +108,46 @@
       <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <UiStat label="课程总数" :value="stats.courseTotal" :hint="`已上架 ${stats.coursePublished} 门`" :icon="Boxes" tone="brand" />
         <UiStat label="在读学员" :value="stats.studentActive" :hint="`档案共 ${stats.studentTotal} 人`" :icon="Users" tone="green" />
-        <UiStat label="魔方成绩" :value="stats.scoreTotal" :hint="`累计录入记录`" :icon="Trophy" tone="orange" />
+        <UiStat
+          label="魔方成绩"
+          :value="stats.scoreTotal"
+          :hint="weekly.thisWeek ? `本周 +${weekly.thisWeek} 条` : '累计录入记录'"
+          :icon="Trophy"
+          tone="orange"
+        />
         <UiStat label="教学资源" :value="stats.resourceTotal" :hint="`机构资料库`" :icon="FolderOpen" tone="violet" />
+      </div>
+
+      <!-- 待关注学员（近期未测评，置顶提醒） -->
+      <div v-if="auth.can('student.view') && auth.can('score.view')" class="fc-card mt-5 p-4.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-800">
+            <TriangleAlert class="size-4 text-amber-500" />待关注学员
+            <span
+              v-if="attention.total"
+              class="rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600"
+            >{{ attention.total }} 人超 30 天未测评</span>
+          </h3>
+          <RouterLink :to="{ name: 'honor' }" class="text-xs text-brand-600 hover:underline">
+            查看荣誉墙
+          </RouterLink>
+        </div>
+
+        <div v-if="attention.items.length" class="mt-3 flex flex-wrap gap-2">
+          <button
+            v-for="row in attention.items"
+            :key="row.id"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50/70 py-1 pr-3 pl-1 text-[12.5px] text-ink-700 transition hover:bg-amber-100"
+            :title="row.lastDate ? `最后测试 ${row.lastDate}` : '从未测试'"
+            @click="goStudent(row.id)"
+          >
+            <UiAvatar :src="row.avatar_url" :name="row.name" size="xs" />
+            {{ row.name }}
+            <span class="font-medium text-amber-600">{{ row.days == null ? '未测试' : row.days + ' 天' }}</span>
+          </button>
+        </div>
+        <p v-else class="mt-3 text-[12.5px] text-emerald-600">全部在读学员近 30 天都有测试记录，状态良好。</p>
       </div>
 
       <div class="mt-5 grid gap-4 lg:grid-cols-2">
@@ -402,7 +440,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import {
   ArrowDown,
   Boxes,
@@ -415,6 +453,7 @@ import {
   Quote,
   RefreshCw,
   Sparkles,
+  TriangleAlert,
   Trophy,
   Users,
 } from 'lucide-vue-next'
@@ -428,17 +467,20 @@ import { useSiteStore } from '@/stores/site'
 import { COURSE_STATUS } from '@/lib/dict'
 import { assetUrl } from '@/lib/assets'
 import { formatDuration, formatFileSize, relativeTime } from '@/lib/format'
-import { dashboardStats, recentCourses, recentResources } from '@/api/stats'
+import { dashboardStats, recentCourses, recentResources, weeklyScoreStats, attentionStudents } from '@/api/stats'
 import { listCoaches } from '@/api/coaches'
 
 const auth = useAuthStore()
 const site = useSiteStore()
+const router = useRouter()
 
 const coaches = ref([])
 const stats = ref({})
 const recentCourseList = ref([])
 const recentResourceList = ref([])
 const loadingStats = ref(false)
+const weekly = ref({ thisWeek: 0, lastWeek: 0, delta: 0 })
+const attention = ref({ total: 0, items: [] })
 
 const brand = computed(() => site.brand)
 const hero = computed(() => site.hero)
@@ -508,20 +550,32 @@ async function loadCoaches() {
 async function loadDashboard() {
   if (!auth.isLoggedIn) return
   loadingStats.value = true
+  const canScore = auth.can('score.view')
+  const canStudent = auth.can('student.view')
   try {
-    const [s, courses, resources] = await Promise.all([
+    const [s, courses, resources, w, att] = await Promise.all([
       dashboardStats(),
       auth.can('course.view') ? recentCourses(5) : Promise.resolve([]),
       auth.can('resource.view') ? recentResources(5) : Promise.resolve([]),
+      canScore ? weeklyScoreStats() : Promise.resolve({ thisWeek: 0, lastWeek: 0, delta: 0 }),
+      canScore && canStudent
+        ? attentionStudents({ days: 30, limit: 8 })
+        : Promise.resolve({ total: 0, items: [] }),
     ])
     stats.value = s
     recentCourseList.value = courses
     recentResourceList.value = resources
+    weekly.value = w
+    attention.value = att
   } catch {
     // 看板失败不影响首页主体
   } finally {
     loadingStats.value = false
   }
+}
+
+function goStudent(id) {
+  router.push({ name: 'student-detail', params: { id } })
 }
 
 onMounted(async () => {

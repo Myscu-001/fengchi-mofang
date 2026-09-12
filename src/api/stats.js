@@ -67,3 +67,52 @@ export async function recentResources(limit = 5) {
   if (error) throw new Error(errorMessage(error, '加载最近资源失败'))
   return data || []
 }
+
+const isoDate = (d) => d.toISOString().slice(0, 10)
+
+/** 本周（最近 7 天）新增成绩，并与上一个 7 天对比 */
+export async function weeklyScoreStats() {
+  const now = new Date()
+  const d7 = new Date(now)
+  d7.setDate(now.getDate() - 6)
+  const d14 = new Date(now)
+  d14.setDate(now.getDate() - 13)
+
+  const [thisWeek, lastWeek] = await Promise.all([
+    countOf(TABLES.scores, (q) => q.gte('recorded_at', isoDate(d7))),
+    countOf(TABLES.scores, (q) => q.gte('recorded_at', isoDate(d14)).lt('recorded_at', isoDate(d7))),
+  ])
+  return { thisWeek, lastWeek, delta: thisWeek - lastWeek }
+}
+
+/**
+ * 待关注学员：最近一次测试距今 ≥ days 天（含从未测试）的在读学员。
+ * 用于首页看板提醒老师及时安排测评。
+ */
+export async function attentionStudents({ days = 30, limit = 8 } = {}) {
+  const [{ data: students, error: sErr }, { data: scores, error: scErr }] = await Promise.all([
+    supabase.from(TABLES.students).select('id, name, avatar_url, status').eq('status', 'active'),
+    supabase.from(TABLES.scores).select('student_id, recorded_at'),
+  ])
+  if (sErr) throw new Error(errorMessage(sErr, '加载学员失败'))
+  if (scErr) throw new Error(errorMessage(scErr, '加载成绩失败'))
+
+  const last = new Map()
+  for (const s of scores || []) {
+    const d = s.recorded_at
+    if (!d) continue
+    if (!last.has(s.student_id) || d > last.get(s.student_id)) last.set(s.student_id, d)
+  }
+
+  const today = Date.now()
+  const rows = (students || [])
+    .map((st) => {
+      const d = last.get(st.id) || null
+      const diff = d ? Math.floor((today - new Date(d).getTime()) / 86400000) : null
+      return { ...st, lastDate: d, days: diff }
+    })
+    .filter((r) => r.days == null || r.days >= days)
+    .sort((a, b) => (b.days ?? 9999) - (a.days ?? 9999))
+
+  return { total: rows.length, items: rows.slice(0, limit) }
+}

@@ -83,6 +83,12 @@ const routes = [
         component: () => import('@/views/admin/SettingsView.vue'),
         meta: { title: '站点配置', requiresAuth: true, permission: 'settings.manage' },
       },
+      {
+        path: 'admin/audit',
+        name: 'admin-audit',
+        component: () => import('@/views/admin/AuditView.vue'),
+        meta: { title: '操作日志', requiresAuth: true, permission: 'user.manage' },
+      },
     ],
   },
   {

@@ -329,6 +329,7 @@ import { listSettings, saveSetting } from '@/api/settings'
 import { CUBE_PROJECTS } from '@/lib/dict'
 import { ensureRanksLoaded, saveRanks, DEFAULT_RANKS } from '@/lib/ranks'
 import { loadMonitorConfig } from '@/lib/monitor'
+import { recordAudit } from '@/lib/audit'
 import { useToastStore } from '@/stores/toast'
 
 const toast = useToastStore()
@@ -385,6 +386,7 @@ async function saveRanksSection() {
   savingKey.value = 'cube.ranks'
   try {
     await saveRanks(JSON.parse(JSON.stringify(ranks)))
+    recordAudit({ action: 'settings', targetType: 'settings', targetId: 'cube.ranks', summary: '保存魔方段位体系' })
     toast.success('段位体系已保存')
   } catch (err) {
     toast.error(err.message)
@@ -402,6 +404,7 @@ async function saveOne(key) {
   try {
     await saveSetting(key, buildValue(key))
     if (key === 'monitor.config') await loadMonitorConfig()
+    recordAudit({ action: 'settings', targetType: 'settings', targetId: key, summary: `保存站点配置「${key}」` })
     toast.success('已保存')
   } catch (err) {
     toast.error(err.message)
@@ -416,6 +419,7 @@ async function saveAll() {
   try {
     await Promise.all(keys.map((key) => saveSetting(key, buildValue(key))))
     await Promise.all([ensureRanksLoaded(), loadMonitorConfig()])
+    recordAudit({ action: 'settings', targetType: 'settings', summary: '保存全部站点配置' })
     toast.success('站点配置已全部保存')
   } catch (err) {
     toast.error(err.message)

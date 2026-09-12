@@ -594,6 +594,7 @@ import { formatDate, formatFileSize } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
+import { recordAudit } from '@/lib/audit'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -889,13 +890,31 @@ async function submit() {
         patch.file_size = 0
       }
       await updateResource(editing.value.id, patch)
+      recordAudit({
+        action: 'update',
+        targetType: 'resource',
+        targetId: editing.value.id,
+        summary: `修改资源「${payload.title || editing.value.title}」`,
+      })
       toast.success('资源信息已保存')
     } else if (isLinkMode) {
-      await createLinkResource({ ...payload, url: linkUrl, file_type: form.linkType })
+      const created = await createLinkResource({ ...payload, url: linkUrl, file_type: form.linkType })
+      recordAudit({
+        action: 'link',
+        targetType: 'resource',
+        targetId: created?.id,
+        summary: `添加链接资源「${payload.title || linkUrl}」`,
+      })
       toast.success('链接资源已添加')
     } else {
-      await uploadResource(selectedFile.value, payload, (p) => {
+      const created = await uploadResource(selectedFile.value, payload, (p) => {
         progress.value = p
+      })
+      recordAudit({
+        action: 'upload',
+        targetType: 'resource',
+        targetId: created?.id,
+        summary: `上传资源「${payload.title || selectedFile.value?.name}」`,
       })
       toast.success('资源上传成功')
     }
@@ -918,6 +937,12 @@ async function remove(res) {
   if (!ok) return
   try {
     await deleteResource(res)
+    recordAudit({
+      action: 'delete',
+      targetType: 'resource',
+      targetId: res.id,
+      summary: `删除资源「${res.title}」`,
+    })
     toast.success('资源已删除')
     await Promise.all([loadResources(), loadCategories(), loadTop(), loadTagStats()])
   } catch (err) {

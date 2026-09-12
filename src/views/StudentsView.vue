@@ -272,6 +272,7 @@ import { downloadCsv } from '@/lib/csv'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
+import { recordAudit } from '@/lib/audit'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -412,9 +413,21 @@ async function save() {
     }
     if (editing.value) {
       await updateStudent(editing.value.id, payload)
+      recordAudit({
+        action: 'update',
+        targetType: 'student',
+        targetId: editing.value.id,
+        summary: `修改学员档案「${payload.name}」`,
+      })
       toast.success('学员信息已保存')
     } else {
-      await createStudent(payload)
+      const created = await createStudent(payload)
+      recordAudit({
+        action: 'create',
+        targetType: 'student',
+        targetId: created?.id,
+        summary: `新增学员「${payload.name}」`,
+      })
       toast.success('学员已新增')
     }
     formOpen.value = false
@@ -436,6 +449,12 @@ async function remove(student) {
   if (!ok) return
   try {
     await deleteStudent(student.id)
+    recordAudit({
+      action: 'delete',
+      targetType: 'student',
+      targetId: student.id,
+      summary: `删除学员「${student.name}」`,
+    })
     toast.success('学员已删除')
     await Promise.all([load(), loadCounts()])
   } catch (err) {

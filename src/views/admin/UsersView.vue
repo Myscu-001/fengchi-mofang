@@ -264,6 +264,7 @@ import { formatDate, relativeTime } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
+import { recordAudit } from '@/lib/audit'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -364,6 +365,12 @@ async function submitCreate() {
   creating.value = true
   try {
     await createStaff({ ...cForm })
+    recordAudit({
+      action: 'create',
+      targetType: 'account',
+      targetId: cForm.email,
+      summary: `创建账号「${cForm.full_name}」（${cForm.email}）`,
+    })
     toast.success('账号已创建，请把初始密码告知该员工')
     createOpen.value = false
     await Promise.all([load(), loadStats()])
@@ -402,6 +409,12 @@ async function submitEdit() {
       delete payload.status
     }
     await updateStaff(editTarget.value.id, payload)
+    recordAudit({
+      action: 'update',
+      targetType: 'account',
+      targetId: editTarget.value.id,
+      summary: `修改账号「${eForm.full_name}」的信息`,
+    })
     toast.success('员工信息已保存')
     editOpen.value = false
     await Promise.all([load(), loadStats()])
@@ -436,6 +449,12 @@ async function submitReset() {
   resetting.value = true
   try {
     await resetStaffPassword(resetTarget.value.id, resetPassword.value)
+    recordAudit({
+      action: 'update',
+      targetType: 'account',
+      targetId: resetTarget.value.id,
+      summary: `重置账号「${resetTarget.value.full_name || resetTarget.value.email}」的密码`,
+    })
     toast.success('密码已重置，请安全告知该员工')
     resetOpen.value = false
   } catch (err) {
@@ -456,6 +475,12 @@ async function remove(target) {
   if (!ok) return
   try {
     await deleteStaff(target.id)
+    recordAudit({
+      action: 'delete',
+      targetType: 'account',
+      targetId: target.id,
+      summary: `删除账号「${target.full_name || target.email}」`,
+    })
     toast.success('账号已删除')
     await Promise.all([load(), loadStats()])
   } catch (err) {

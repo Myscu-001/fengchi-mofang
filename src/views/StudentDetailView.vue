@@ -625,6 +625,7 @@ import {
 import { listResourcesByTag, isLinkResource, previewUrl } from '@/api/resources'
 import { loadGoals, saveGoals } from '@/api/goals'
 import { getSetting } from '@/api/settings'
+import { recordAudit } from '@/lib/audit'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
@@ -1022,6 +1023,12 @@ async function saveScore() {
     }
     if (editing.value) await updateScore(editing.value.id, payload)
     else await createScore(payload)
+    recordAudit({
+      action: editing.value ? 'update' : 'create',
+      targetType: 'score',
+      targetId: student.value.id,
+      summary: `${editing.value ? '修改' : '新增'} ${student.value.name} 的${cubeMeta.value?.label || ''}成绩（${payload.recordedAt}）`,
+    })
     toast.success('成绩已保存')
     scoreOpen.value = false
     await loadProject()
@@ -1037,6 +1044,12 @@ async function remove(row) {
   if (!ok) return
   try {
     await deleteScore(row.id)
+    recordAudit({
+      action: 'delete',
+      targetType: 'score',
+      targetId: student.value.id,
+      summary: `删除 ${student.value.name} 的${cubeMeta.value?.label || ''}成绩（${formatDate(row.recorded_at)}）`,
+    })
     toast.success('成绩已删除')
     await loadProject()
   } catch (err) {
@@ -1056,6 +1069,12 @@ async function confirmBulkDelete() {
     const snapshot = await listScores({ studentId: student.value.id, project: project.value, page: 1, pageSize: 10000 })
     await bulkDeleteScores({ studentId: student.value.id, project: project.value })
     bulkDeleted.value = snapshot.items
+    recordAudit({
+      action: 'delete',
+      targetType: 'score',
+      targetId: student.value.id,
+      summary: `清空 ${student.value.name} 的${cubeMeta.value?.label || ''}全部成绩（${snapshot.items.length} 条）`,
+    })
     toast.success('已清空，可点击「撤回」恢复')
     await loadProject()
   } catch (err) {
@@ -1278,6 +1297,12 @@ async function saveGoal() {
     next[sid][project.value] = goal
     await persistGoals(next)
     goalOpen.value = false
+    recordAudit({
+      action: 'update',
+      targetType: 'goal',
+      targetId: student.value.id,
+      summary: `设置 ${student.value.name} 的${cubeMeta.value?.label || ''}训练目标`,
+    })
     toast.success('目标已保存')
   } catch (err) {
     toast.error(err.message)
@@ -1303,6 +1328,12 @@ async function removeGoal() {
     if (!Object.keys(next[sid]).length) delete next[sid]
     await persistGoals(next)
     goalOpen.value = false
+    recordAudit({
+      action: 'delete',
+      targetType: 'goal',
+      targetId: student.value.id,
+      summary: `删除 ${student.value.name} 的${cubeMeta.value?.label || ''}训练目标`,
+    })
     toast.success('目标已删除')
   } catch (err) {
     toast.error(err.message)
