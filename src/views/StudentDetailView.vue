@@ -615,6 +615,7 @@ import {
   listScores,
   scoreStats,
   studentProjectBests,
+  listAllStudentScores,
   createScore,
   updateScore,
   deleteScore,
@@ -622,6 +623,7 @@ import {
   buildScoreCsv,
   computeAo5,
 } from '@/api/scores'
+import { listScoresForAnalysis } from '@/api/analytics'
 import { listResourcesByTag, isLinkResource, previewUrl } from '@/api/resources'
 import { loadGoals, saveGoals } from '@/api/goals'
 import { getSetting } from '@/api/settings'
@@ -1343,6 +1345,104 @@ async function removeGoal() {
 }
 
 /** 生成可打印的学员成长报告（浏览器打印 → 另存为 PDF，方便发家长） */
+// ===== 成长报告辅助 =====
+const escHtml = (v) =>
+  String(v == null ? '' : v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+function projectLabelOf(value) {
+  return CUBE_PROJECTS.find((p) => p.value === value)?.label || value
+}
+
+/** 生成成绩趋势折线图（平均 + 单次），数据不足时返回空串 */
+function buildTrendSvg(list) {
+  const W = 700
+  const H = 200
+  const padL = 38
+  const padR = 14
+  const padT = 12
+  const padB = 24
+  const pts = (list || []).filter(
+    (s) => (!s.avg_is_dnf && s.avg_seconds != null) || (!s.single_is_dnf && s.single_best_seconds != null),
+  )
+  if (pts.length < 2) return ''
+  const avgPts = pts.filter((s) => !s.avg_is_dnf && s.avg_seconds != null)
+  const singlePts = pts.filter((s) => !s.single_is_dnf && s.single_best_seconds != null)
+  const vals = [
+    ...avgPts.map((s) => Number(s.avg_seconds)),
+    ...singlePts.map((s) => Number(s.single_best_seconds)),
+  ]
+  if (!vals.length) return ''
+  let yMin = Math.floor(Math.min(...vals))
+  let yMax = Math.ceil(Math.max(...vals))
+  if (yMax - yMin < 4) {
+    yMin = Math.max(0, yMin - 1)
+    yMax += 1
+  }
+  const ts = pts.map((s) => new Date(s.recorded_at).getTime())
+  const xMin = Math.min(...ts)
+  const xMax = Math.max(...ts)
+  const xOf = (t) => (xMax === xMin ? (padL + W - padR) / 2 : padL + ((t - xMin) / (xMax - xMin)) * (W - padL - padR))
+  const yOf = (v) => padT + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - padT - padB)
+  const span = yMax - yMin || 1
+  const step = span <= 6 ? 1 : Math.ceil(span / 5)
+  let grid = ''
+  for (let v = yMin; v <= yMax; v += step) {
+    const y = yOf(v)
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="#EEF0F2" stroke-width="1"/>`
+    grid += `<text x="${padL - 5}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#9aa0a6">${v}</text>`
+  }
+  const poly = (arr, key) =>
+    arr.map((s) => `${xOf(new Date(s.recorded_at).getTime()).toFixed(1)},${yOf(Number(s[key])).toFixed(1)}`).join(' ')
+  const dots = (arr, key, color) =>
+    arr
+      .map(
+        (s) =>
+          `<circle cx="${xOf(new Date(s.recorded_at).getTime()).toFixed(1)}" cy="${yOf(Number(s[key])).toFixed(1)}" r="2.6" fill="${color}" stroke="#fff" stroke-width="1"/>`,
+      )
+      .join('')
+  let lines = ''
+  if (avgPts.length >= 2) lines += `<polyline points="${poly(avgPts, 'avg_seconds')}" fill="none" stroke="#10b981" stroke-width="2" stroke-linejoin="round"/>`
+  if (singlePts.length >= 2) {
+    lines += `<polyline points="${poly(singlePts, 'single_best_seconds')}" fill="none" stroke="#f97316" stroke-width="2" stroke-linejoin="round"/>`
+  }
+  const xLabels =
+    `<text x="${padL}" y="${H - 8}" font-size="9" fill="#9aa0a6">${escHtml(formatDate(new Date(xMin)))}</text>` +
+    `<text x="${W - padR}" y="${H - 8}" text-anchor="end" font-size="9" fill="#9aa0a6">${escHtml(formatDate(new Date(xMax)))}</text>`
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">${grid}${lines}${dots(avgPts, 'avg_seconds', '#10b981')}${dots(singlePts, 'single_best_seconds', '#f97316')}${xLabels}</svg>`
+}
+
+/** 目标完成度：返回 { achieved, pct, text } */
+function goalProgressOf(project, g, bestAvg) {
+  const best = bestAvg ?? null
+  if (g.type === 'rank') {
+    const tiers = rankTiers(project)
+    const targetIdx = tiers.findIndex((t) => t.key === g.target)
+    const curRank = rankForProject(project, best)
+    const curIdx = curRank ? tiers.findIndex((t) => t.key === curRank.key) : -1
+    const achieved = best != null && targetIdx >= 0 && curIdx >= targetIdx
+    const pct = achieved ? 1 : targetIdx >= 0 ? Math.max(0, Math.min(1, (curIdx + 1) / (targetIdx + 1))) : 0
+    const tl = tiers.find((t) => t.key === g.target)?.label || '—'
+    return {
+      achieved,
+      pct,
+      text: `当前段位 ${curRank?.label || '未达标'} · 目标 ${tl}${g.due ? ' · 截止 ' + formatDate(g.due) : ''}`,
+    }
+  }
+  const target = Number(g.target)
+  const base = g.baseline != null && g.baseline !== '' ? Number(g.baseline) : best
+  const achieved = best != null && target > 0 && best <= target
+  let pct = 0
+  if (achieved) pct = 1
+  else if (base != null && best != null && base > target && target > 0) {
+    pct = Math.max(0, Math.min(1, (base - best) / (base - target)))
+  }
+  return {
+    achieved,
+    pct,
+    text: `当前 ${best != null ? best.toFixed(2) + 's' : '—'} · 目标 ${target.toFixed(2)}s${g.due ? ' · 截止 ' + formatDate(g.due) : ''}`,
+  }
+}
+
 async function exportReport() {
   const st = student.value
   if (!st) return
@@ -1360,19 +1460,188 @@ async function exportReport() {
   const fmt = (v) => (v == null ? '—' : Number(v).toFixed(2) + 's')
   const fmtRow = (v, dnf) => (dnf ? 'DNF' : v == null ? '—' : Number(v).toFixed(2))
 
-  const rankCards = ranks.value
-    .map((r) => {
-      const single = bests.value?.[r.value]?.bestSingle ?? null
-      return `<div class="card"${r.rank ? ` style="border-color:${r.rank.color}66"` : ''}>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <b>${esc(r.label)}</b>
-          ${r.rank ? `<span class="rank" style="background:${r.rank.color}">${esc(r.rank.label)}</span>` : '<span class="muted">未达标</span>'}
-        </div>
-        <div class="line">最佳平均 <b>${fmt(r.bestAvg)}</b></div>
-        <div class="line">最佳单次 <b>${fmt(single)}</b></div>
-      </div>`
-    })
-    .join('')
+  // ===== 额外数据：该学员全部成绩 + 全机构排名（失败不影响报告主体）=====
+  let allScores = []
+  const inst = {}
+  if (auth.can('score.view')) {
+    try {
+      const [mine, everyone] = await Promise.all([listAllStudentScores(st.id), listScoresForAnalysis({})])
+      allScores = mine
+      for (const s of everyone) {
+        if (!inst[s.project]) inst[s.project] = { avg: new Map(), single: new Map() }
+        const b = inst[s.project]
+        if (!s.avg_is_dnf && s.avg_seconds != null) {
+          const v = Number(s.avg_seconds)
+          const c = b.avg.get(s.student_id)
+          if (c == null || v < c) b.avg.set(s.student_id, v)
+        }
+        if (!s.single_is_dnf && s.single_best_seconds != null) {
+          const v = Number(s.single_best_seconds)
+          const c = b.single.get(s.student_id)
+          if (c == null || v < c) b.single.set(s.student_id, v)
+        }
+      }
+    } catch {
+      allScores = []
+    }
+  }
+
+  const rankOfProject = (proj) => {
+    const m = inst[proj]?.avg
+    if (!m || !m.has(st.id)) return null
+    const sorted = [...m.entries()].sort((a, b) => a[1] - b[1])
+    const idx = sorted.findIndex(([sid]) => sid === st.id)
+    return { rank: idx + 1, total: sorted.length }
+  }
+
+  const projCount = {}
+  for (const s of allScores) projCount[s.project] = (projCount[s.project] || 0) + 1
+
+  // ===== 综合概览 =====
+  const totalTests = allScores.length || scores.value.length
+  const coveredCount = Object.keys(projCount).length || ranks.value.filter((r) => r.bestAvg != null).length
+  const firstScoreDate = allScores.length ? allScores[0].recorded_at : null
+  const startDate = st.joined_at || firstScoreDate
+  const trainDays = startDate ? Math.max(1, Math.round((Date.now() - new Date(startDate).getTime()) / 86400000)) : null
+
+  const cutoff30 = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 30)
+    return d.toISOString().slice(0, 10)
+  })()
+  let pb30 = 0
+  {
+    const running = {}
+    for (const s of allScores) {
+      if (s.avg_is_dnf || s.avg_seconds == null) continue
+      const v = Number(s.avg_seconds)
+      const cur = running[s.project]
+      if (cur == null || v < cur) {
+        running[s.project] = v
+        if (String(s.recorded_at) >= cutoff30) pb30 += 1
+      }
+    }
+  }
+
+  const overviewHtml = `<h2>综合概览</h2>
+  <div class="ov">
+    <div><b>${trainDays != null ? trainDays : '—'}</b><span>入训天数</span></div>
+    <div><b>${totalTests}</b><span>累计测试</span></div>
+    <div><b>${coveredCount}/6</b><span>覆盖项目</span></div>
+    <div><b>${pb30}</b><span>近30天刷新PB</span></div>
+  </div>`
+
+  // ===== 进步总结 =====
+  const validAvg = scores.value
+    .filter((s) => !s.avg_is_dnf && s.avg_seconds != null)
+    .map((s) => ({ d: String(s.recorded_at), v: Number(s.avg_seconds) }))
+    .sort((a, b) => a.d.localeCompare(b.d))
+  let progressSentence = ''
+  if (validAvg.length >= 2) {
+    const half = Math.max(1, Math.floor(validAvg.length / 2))
+    const early = Math.min(...validAvg.slice(0, half).map((x) => x.v))
+    const late = Math.min(...validAvg.slice(-half).map((x) => x.v))
+    const delta = early - late
+    const curLabel = cubeMeta.value?.label || ''
+    progressSentence =
+      delta > 0.01
+        ? `${curLabel}最佳平均从 ${early.toFixed(2)}s 提升到 ${late.toFixed(2)}s，共提速 ${delta.toFixed(2)}s`
+        : `${curLabel}最佳平均稳定在 ${late.toFixed(2)}s 左右`
+    if (pb30 > 0) progressSentence += `；近 30 天刷新个人纪录 ${pb30} 次`
+    const rk = rankOfProject(project.value)
+    if (rk && rk.total > 1) progressSentence += `；当前机构排名第 ${rk.rank} / ${rk.total}`
+    progressSentence += '。'
+  }
+  const progressHtml = progressSentence ? `<div class="hi">${esc(progressSentence)}</div>` : ''
+
+  // ===== 训练目标 =====
+  const myGoals = Object.entries(goals.value?.[st.id] || {})
+  const goalHtml = myGoals.length
+    ? `<h2>训练目标</h2><div class="goals">${myGoals
+        .map(([proj, g]) => {
+          const best = bests.value?.[proj]?.bestAvg ?? null
+          const gp = goalProgressOf(proj, g, best)
+          return `<div class="goal">
+            <div class="goal-top"><b>${esc(projectLabelOf(proj))}</b>
+              <span class="tag ${gp.achieved ? 'ok' : 'doing'}">${gp.achieved ? '已达成' : '进行中'}</span>
+            </div>
+            <div class="muted">${esc(gp.text)}</div>
+            <div class="bar"><i style="width:${Math.round(gp.pct * 100)}%;background:${gp.achieved ? '#10b981' : '#EA625F'}"></i></div>
+          </div>`
+        })
+        .join('')}</div>`
+    : ''
+
+  // ===== 段位与最好成绩汇总表 =====
+  const summaryRows = CUBE_PROJECTS.map((p) => {
+    const best = bests.value?.[p.value] || {}
+    const bestAvg = best.bestAvg ?? null
+    return {
+      label: p.label,
+      color: p.color,
+      count: projCount[p.value] || 0,
+      bestAvg,
+      bestSingle: best.bestSingle ?? null,
+      tier: rankForProject(p.value, bestAvg) || null,
+      rank: rankOfProject(p.value),
+    }
+  }).filter((r) => r.count > 0 || r.bestAvg != null)
+
+  const summaryHtml = summaryRows.length
+    ? `<h2>段位与最好成绩</h2>
+  <table>
+    <thead><tr><th>项目</th><th>段位</th><th>测试次数</th><th>最佳平均(秒)</th><th>最佳单次(秒)</th><th>机构排名</th></tr></thead>
+    <tbody>${summaryRows
+      .map(
+        (r) => `<tr>
+      <td><span class="dot" style="background:${r.color}"></span>${esc(r.label)}</td>
+      <td>${r.tier ? `<span class="rank" style="background:${r.tier.color}">${esc(r.tier.label)}</span>` : '<span class="muted">未达标</span>'}</td>
+      <td>${r.count || '—'}</td>
+      <td>${r.bestAvg != null ? r.bestAvg.toFixed(2) : '—'}</td>
+      <td>${r.bestSingle != null ? r.bestSingle.toFixed(2) : '—'}</td>
+      <td>${r.rank ? `第 ${r.rank.rank} / ${r.rank.total}` : '—'}</td>
+    </tr>`,
+      )
+      .join('')}</tbody>
+  </table>`
+    : ''
+
+  // ===== 成绩趋势 =====
+  const trendSvg = buildTrendSvg(scores.value)
+  const trendHtml = trendSvg
+    ? `<h2>${esc(cubeMeta.value?.label || '')} · 成绩趋势</h2>
+  <div class="chart">${trendSvg}</div>
+  <div class="legend"><span><i style="background:#10b981"></i>平均成绩</span><span><i style="background:#f97316"></i>单次最佳</span></div>`
+    : ''
+
+  // ===== 段位里程碑 =====
+  const milestones = []
+  {
+    const byProj = {}
+    for (const s of allScores) {
+      if (!byProj[s.project]) byProj[s.project] = []
+      byProj[s.project].push(s)
+    }
+    for (const [proj, list] of Object.entries(byProj)) {
+      const tiers = rankTiers(proj)
+      const sorted = [...list].sort((a, b) => String(a.recorded_at).localeCompare(String(b.recorded_at)))
+      for (const t of tiers) {
+        const hit = sorted.find((s) => !s.avg_is_dnf && s.avg_seconds != null && Number(s.avg_seconds) < t.max)
+        if (hit) milestones.push({ proj, tier: t, date: hit.recorded_at })
+      }
+    }
+    milestones.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+  }
+  const milestoneHtml = milestones.length
+    ? `<h2>段位里程碑</h2><div class="ms">${milestones
+        .slice(0, 10)
+        .map(
+          (m) => `<div class="ms-row"><span class="ms-date">${esc(formatDate(m.date))}</span>
+      <span class="rank" style="background:${m.tier.color}">${esc(m.tier.label)}</span>
+      <span class="ms-proj">${esc(projectLabelOf(m.proj))} 达标</span></div>`,
+        )
+        .join('')}</div>`
+    : ''
 
   const recent = scores.value.slice(0, 12)
   const rows = recent.length
@@ -1417,6 +1686,28 @@ async function exportReport() {
   .card{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;}
   .card .line{font-size:12px;color:#4b5563;margin-top:4px;}
   .rank{display:inline-block;padding:1px 6px;border-radius:4px;color:#fff;font-size:11px;}
+  .ov{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;}
+  .ov div{border:1px solid #e5e7eb;border-radius:8px;padding:10px 4px;}
+  .ov b{display:block;font-size:19px;color:#EA625F;}
+  .ov span{font-size:11px;color:#9aa0a6;}
+  .hi{margin:10px 0 0;border-left:3px solid #10b981;background:#ecfdf5;color:#065f46;font-size:12.5px;line-height:1.8;padding:9px 12px;border-radius:0 6px 6px 0;}
+  .goals{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+  .goal{border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;}
+  .goal-top{display:flex;justify-content:space-between;align-items:center;}
+  .goal .muted{font-size:11.5px;color:#9aa0a6;margin-top:4px;}
+  .bar{margin-top:6px;height:6px;border-radius:99px;background:#f1f3f5;overflow:hidden;}
+  .bar i{display:block;height:100%;border-radius:99px;}
+  .tag{font-size:10.5px;padding:1px 6px;border-radius:4px;}
+  .tag.ok{background:#ecfdf5;color:#059669;}
+  .tag.doing{background:#fff7ed;color:#c2410c;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle;}
+  .chart{border:1px solid #e5e7eb;border-radius:8px;padding:6px 4px;}
+  .legend{margin-top:6px;font-size:11px;color:#6b7280;display:flex;gap:16px;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:5px;vertical-align:middle;}
+  .ms{display:flex;flex-direction:column;gap:6px;}
+  .ms-row{display:flex;align-items:center;gap:10px;font-size:12px;border-bottom:1px dashed #eef0f2;padding-bottom:6px;}
+  .ms-date{color:#9aa0a6;width:88px;}
+  .ms-proj{color:#4b5563;}
   table{width:100%;border-collapse:collapse;font-size:12.5px;}
   th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;}
   th{background:#f9fafb;color:#6b7280;font-weight:500;}
@@ -1437,8 +1728,12 @@ async function exportReport() {
     <div><b>家长：</b>${esc(st.guardian_name || '—')}　　<b>加入日期：</b>${esc(formatDate(st.joined_at))}</div>
   </div>
 
-  <h2>魔方段位与最好成绩</h2>
-  <div class="grid">${rankCards}</div>
+  ${overviewHtml}
+  ${progressHtml}
+  ${goalHtml}
+  ${summaryHtml}
+  ${trendHtml}
+  ${milestoneHtml}
 
   <h2>${esc(cubeMeta.value?.label || '')} · 近期成绩</h2>
   <table>

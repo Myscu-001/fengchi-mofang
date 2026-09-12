@@ -137,6 +137,20 @@ export async function deleteScore(id) {
   if (error) throw new Error(errorMessage(error, '删除成绩失败'))
 }
 
+/**
+ * 某学员的全部成绩（跨所有项目，按日期升序）。
+ * 供「成长报告」统计测试次数、覆盖项目、里程碑与趋势使用。
+ */
+export async function listAllStudentScores(studentId) {
+  const { data, error } = await supabase
+    .from(TABLES.scores)
+    .select('project,recorded_at,avg_seconds,avg_is_dnf,single_best_seconds,single_is_dnf,mode,note')
+    .eq('student_id', studentId)
+    .order('recorded_at', { ascending: true })
+  if (error) throw new Error(errorMessage(error, '加载成绩失败'))
+  return data || []
+}
+
 /** 聚合某学员在各魔方项目上的最佳平均成绩 / 最佳单次（用于段位评定与概览） */
 export async function studentProjectBests({ studentId }) {
   const { data, error } = await supabase
