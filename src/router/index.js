@@ -36,6 +36,12 @@ const routes = [
         meta: { title: '学员档案', requiresAuth: true, permission: 'student.view' },
       },
       {
+        path: 'students/:id/learning',
+        name: 'student-learning',
+        component: () => import('@/views/StudentLearningView.vue'),
+        meta: { title: '学习记录', requiresAuth: true, permission: 'student.view' },
+      },
+      {
         path: 'resources',
         name: 'resources',
         component: () => import('@/views/ResourcesView.vue'),
