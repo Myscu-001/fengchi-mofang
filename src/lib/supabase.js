@@ -65,6 +65,7 @@ export const TABLES = {
   coaches: 'coaches',
   siteSettings: 'site_settings',
   auditLogs: 'audit_logs',
+  learningLogs: 'student_learning_logs',
 }
 
 export const BUCKETS = {

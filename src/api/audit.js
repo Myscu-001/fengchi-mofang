@@ -62,6 +62,7 @@ export const AUDIT_TARGETS = [
   { value: 'coach', label: '师资' },
   { value: 'settings', label: '站点配置' },
   { value: 'goal', label: '训练目标' },
+  { value: 'learning', label: '学习记录' },
 ]
 
 export function auditActionMeta(action) {

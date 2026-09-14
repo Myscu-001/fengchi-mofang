@@ -139,6 +139,77 @@
         </p>
       </div>
 
+      <!-- 学习记录 -->
+      <div class="fc-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="flex items-center gap-1.5 text-[14px] font-semibold text-ink-900">
+            <BookOpen class="size-4 text-brand-500" />学习记录
+            <span v-if="learningLogs.length" class="ml-1 text-[12px] font-normal text-ink-400">
+              {{ learningLogs.length }} 条
+            </span>
+          </h3>
+          <UiButton v-if="canManageStudent" variant="outline" size="sm" @click="openAddLog">
+            <template #icon><Plus class="size-3.5" /></template>
+            添加记录
+          </UiButton>
+        </div>
+
+        <div
+          v-if="learningMissing"
+          class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-[12.5px] leading-relaxed text-amber-700"
+        >
+          学习记录数据表尚未创建。请在 Supabase 后台 SQL 编辑器执行
+          <code class="rounded bg-white/70 px-1 font-mono text-[11.5px]">supabase/10_student_learning_logs.sql</code>
+          后即可使用。
+        </div>
+
+        <UiLoading v-else-if="learningLoading" text="加载学习记录…" />
+
+        <ol v-else-if="learningLogs.length" class="mt-4">
+          <li v-for="(log, i) in learningLogs" :key="log.id" class="relative flex gap-3.5 pb-5 last:pb-0">
+            <span v-if="i < learningLogs.length - 1" class="absolute top-7 left-[5px] h-full w-px bg-ink-200" />
+            <span class="z-10 mt-1.5 size-2.5 shrink-0 rounded-full bg-brand-500" />
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[12.5px] font-medium text-ink-700">{{ formatDate(log.learned_on) }}</span>
+                <UiBadge
+                  v-if="log.project"
+                  :label="projectLabelOf(log.project)"
+                  custom-class="border-transparent text-white"
+                  :style="{ backgroundColor: CUBE_PROJECTS.find((p) => p.value === log.project)?.color || '#94a3b8' }"
+                />
+                <span
+                  v-for="t in log.tags || []"
+                  :key="t"
+                  class="rounded-md bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-500"
+                >#{{ t }}</span>
+                <div v-if="canManageStudent" class="ml-auto flex items-center gap-1">
+                  <button
+                    class="rounded p-1 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+                    title="编辑"
+                    @click="openEditLog(log)"
+                  >
+                    <Pencil class="size-3.5" />
+                  </button>
+                  <button
+                    class="rounded p-1 text-ink-400 transition hover:bg-red-50 hover:text-red-600"
+                    title="删除"
+                    @click="removeLog(log)"
+                  >
+                    <Trash2 class="size-3.5" />
+                  </button>
+                </div>
+              </div>
+              <p class="mt-1 text-[13px] leading-relaxed whitespace-pre-wrap text-ink-700">{{ log.content }}</p>
+            </div>
+          </li>
+        </ol>
+
+        <p v-else class="mt-3 text-[12.5px] text-ink-400">
+          {{ canManageStudent ? '还没有学习记录，点击「添加记录」记一笔今天学了什么。' : '暂无学习记录。' }}
+        </p>
+      </div>
+
       <!-- 统计卡片 -->
       <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <UiStat label="成绩次数" :value="stats.count" :icon="ListChecks" tone="brand" />
@@ -571,6 +642,44 @@
         <UiButton variant="primary" :loading="goalSaving" @click="saveGoal">保存目标</UiButton>
       </template>
     </UiModal>
+
+    <!-- 学习记录 -->
+    <UiModal :open="logOpen" :title="logEditing ? '编辑学习记录' : '添加学习记录'" width="md" @close="logOpen = false">
+      <div class="space-y-4">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UiField label="学习日期">
+            <input v-model="logForm.learnedOn" type="date" class="fc-input" :max="today" />
+          </UiField>
+          <UiField label="关联魔方项目" hint="可不选">
+            <select v-model="logForm.project" class="fc-input">
+              <option value="">不关联</option>
+              <option v-for="p in CUBE_PROJECTS" :key="p.value" :value="p.value">{{ p.label }}</option>
+            </select>
+          </UiField>
+        </div>
+
+        <UiField label="学习内容" required>
+          <textarea
+            v-model="logForm.content"
+            class="fc-input"
+            rows="4"
+            placeholder="例：今天吃透了 PLL 前 10 个公式，能独立复原四阶前两层"
+          />
+        </UiField>
+
+        <UiField label="标签" hint="多个标签用逗号分隔，可不填">
+          <input v-model="logForm.tags" class="fc-input" placeholder="公式, 提速, 四阶" />
+        </UiField>
+
+        <p v-if="logError" class="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700">
+          {{ logError }}
+        </p>
+      </div>
+      <template #footer>
+        <UiButton variant="outline" @click="logOpen = false">取消</UiButton>
+        <UiButton variant="primary" :loading="logSaving" @click="saveLog">保存</UiButton>
+      </template>
+    </UiModal>
   </div>
 </template>
 
@@ -579,6 +688,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft,
+  BookOpen,
   CalendarClock,
   Download,
   ExternalLink,
@@ -626,6 +736,13 @@ import {
 import { listScoresForAnalysis } from '@/api/analytics'
 import { listResourcesByTag, isLinkResource, previewUrl } from '@/api/resources'
 import { loadGoals, saveGoals } from '@/api/goals'
+import {
+  listLearningLogs,
+  createLearningLog,
+  updateLearningLog,
+  deleteLearningLog,
+  isMissingTableError,
+} from '@/api/learning'
 import { getSetting } from '@/api/settings'
 import { recordAudit } from '@/lib/audit'
 import { useAuthStore } from '@/stores/auth'
@@ -661,6 +778,16 @@ const goals = ref({})
 const goalOpen = ref(false)
 const goalSaving = ref(false)
 const goalForm = reactive({ type: 'time', target: '', baseline: '', due: '', note: '' })
+
+// 学习记录
+const learningLogs = ref([])
+const learningLoading = ref(false)
+const learningMissing = ref(false)
+const logOpen = ref(false)
+const logSaving = ref(false)
+const logError = ref('')
+const logEditing = ref(null)
+const logForm = reactive({ learnedOn: '', project: '', content: '', tags: '' })
 
 const cubeMeta = computed(() => CUBE_PROJECTS.find((p) => p.value === project.value) || null)
 const today = new Date().toISOString().slice(0, 10)
@@ -1200,7 +1327,7 @@ async function load() {
   loading.value = true
   try {
     student.value = await getStudent(route.params.id)
-    if (student.value) await Promise.all([loadProject(), loadBests(), loadGoalsList()])
+    if (student.value) await Promise.all([loadProject(), loadBests(), loadGoalsList(), loadLearning()])
   } catch (err) {
     toast.error(err.message)
   } finally {
@@ -1241,6 +1368,108 @@ async function openRelated(res) {
     }
     const url = await previewUrl(res)
     window.open(url, '_blank', 'noopener')
+  } catch (err) {
+    toast.error(err.message)
+  }
+}
+
+// ===== 学习记录 =====
+async function loadLearning() {
+  if (!auth.can('student.view') || !student.value) return
+  learningLoading.value = true
+  try {
+    learningLogs.value = await listLearningLogs(student.value.id)
+    learningMissing.value = false
+  } catch (err) {
+    learningLogs.value = []
+    learningMissing.value = isMissingTableError(err)
+  } finally {
+    learningLoading.value = false
+  }
+}
+
+function openAddLog() {
+  logEditing.value = null
+  logError.value = ''
+  Object.assign(logForm, { learnedOn: today, project: project.value || '', content: '', tags: '' })
+  logOpen.value = true
+}
+
+function openEditLog(log) {
+  logEditing.value = log
+  logError.value = ''
+  Object.assign(logForm, {
+    learnedOn: log.learned_on || today,
+    project: log.project || '',
+    content: log.content || '',
+    tags: (log.tags || []).join(', '),
+  })
+  logOpen.value = true
+}
+
+async function saveLog() {
+  logError.value = ''
+  if (!logForm.content.trim()) {
+    logError.value = '请填写学习内容'
+    return
+  }
+  logSaving.value = true
+  try {
+    const payload = {
+      studentId: student.value.id,
+      learnedOn: logForm.learnedOn || today,
+      project: logForm.project || null,
+      content: logForm.content,
+      tags: logForm.tags
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    }
+    if (logEditing.value) {
+      await updateLearningLog(logEditing.value.id, payload)
+      recordAudit({
+        action: 'update',
+        targetType: 'learning',
+        targetId: student.value.id,
+        summary: `修改 ${student.value.name} 的学习记录`,
+      })
+    } else {
+      await createLearningLog(payload)
+      recordAudit({
+        action: 'create',
+        targetType: 'learning',
+        targetId: student.value.id,
+        summary: `为 ${student.value.name} 添加学习记录`,
+      })
+    }
+    toast.success('学习记录已保存')
+    logOpen.value = false
+    await loadLearning()
+  } catch (err) {
+    logError.value = err.message
+  } finally {
+    logSaving.value = false
+  }
+}
+
+async function removeLog(log) {
+  const ok = await dialog.confirm({
+    title: '删除学习记录',
+    message: '确认删除这条学习记录吗？',
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteLearningLog(log.id)
+    recordAudit({
+      action: 'delete',
+      targetType: 'learning',
+      targetId: student.value.id,
+      summary: `删除 ${student.value.name} 的一条学习记录`,
+    })
+    toast.success('学习记录已删除')
+    await loadLearning()
   } catch (err) {
     toast.error(err.message)
   }
