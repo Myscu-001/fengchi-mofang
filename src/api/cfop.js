@@ -26,22 +26,35 @@ export async function saveCfopPatterns(patterns) {
 
 /* ---------------- 学习进度（按学员） ---------------- */
 
+/**
+ * 读取某学员的 CFOP 掌握情况
+ * @returns {Promise<Object>} { "oll:12": "2026-09-15", ... }（旧数据可能为空字符串）
+ */
 export async function loadCfopProgress(studentId) {
   const { data, error } = await supabase
     .from(TABLES.cfopProgress)
-    .select('learned_keys')
+    .select('learned')
     .eq('student_id', studentId)
     .maybeSingle()
   if (error) throw new Error(errorMessage(error, '加载 CFOP 学习进度失败'))
-  return new Set(data?.learned_keys || [])
+
+  const out = {}
+  const learned = data?.learned
+  if (learned && typeof learned === 'object' && !Array.isArray(learned)) {
+    for (const [k, v] of Object.entries(learned)) {
+      out[k] = typeof v === 'string' ? v : ''
+    }
+  }
+  return out
 }
 
-export async function saveCfopProgress(studentId, keys) {
+/** 保存某学员的 CFOP 掌握情况（整份覆盖） */
+export async function saveCfopProgress(studentId, learned) {
   const { data: auth } = await supabase.auth.getUser()
   const { error } = await supabase.from(TABLES.cfopProgress).upsert(
     {
       student_id: studentId,
-      learned_keys: Array.from(keys || []),
+      learned: learned || {},
       updated_by: auth?.user?.id ?? null,
     },
     { onConflict: 'student_id' },

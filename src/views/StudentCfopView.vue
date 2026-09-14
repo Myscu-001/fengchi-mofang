@@ -170,20 +170,33 @@
           </header>
 
           <div class="flex flex-wrap gap-2 p-3.5">
-            <button
+            <div
               v-for="c in visibleCases(g.key)"
               :key="c.key"
-              type="button"
               class="cfop-case"
-              :class="{ done: learned.has(c.key) }"
+              :class="{ done: hasLearned(c.key) }"
+              role="button"
+              tabindex="0"
               :title="c.title"
               @click="toggleCase(c)"
+              @keydown.enter.prevent="toggleCase(c)"
             >
               <div v-html="figureFor(c)" />
               <span class="cl">{{ c.label }}</span>
+              <input
+                v-if="hasLearned(c.key)"
+                type="date"
+                class="date"
+                :value="learned[c.key] || ''"
+                :title="learned[c.key] || '未记录日期，点击可补填'"
+                @click.stop
+                @keydown.stop
+                @change="setDate(c.key, $event.target.value)"
+              />
+              <span v-else class="date-empty" />
               <span class="tick">✓</span>
               <span v-if="patterns[c.key]" class="cfg" />
-            </button>
+            </div>
           </div>
 
           <p v-if="!visibleCases(g.key).length" class="px-4 pb-4 text-[12.5px] text-ink-400">
@@ -242,11 +255,24 @@ const canEditPatterns = computed(() => auth.can('settings.manage'))
 const canCheck = computed(() => auth.can('student.manage'))
 
 const student = ref(null)
-const learned = ref(new Set())
+/** { "oll:12": "2026-09-15", ... } */
+const learned = ref({})
 const patterns = ref({})
 const tableMissing = ref(false)
 const loading = ref(true)
 const filter = ref('all')
+
+/** 本地日期(不能用 toISOString:东八区凌晨会算成前一天) */
+function todayStr() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** 是否已掌握(空字符串的旧数据也算已掌握) */
+function hasLearned(key) {
+  return Object.prototype.hasOwnProperty.call(learned.value, key)
+}
 
 const headerDesc = computed(() => {
   const name = student.value?.name || '学员'
@@ -256,12 +282,12 @@ const headerDesc = computed(() => {
 /* ---------- 统计 ---------- */
 const learnedCount = computed(() => {
   let n = 0
-  for (const c of CFOP_CASES) if (learned.value.has(c.key)) n++
+  for (const c of CFOP_CASES) if (hasLearned(c.key)) n++
   return n
 })
 const totalPct = computed(() => Math.round((learnedCount.value / CFOP_TOTAL) * 100))
 function groupDone(key) {
-  return CFOP_CASES.filter((c) => c.group === key && learned.value.has(c.key)).length
+  return CFOP_CASES.filter((c) => c.group === key && hasLearned(c.key)).length
 }
 function groupPct(key) {
   const g = CFOP_GROUPS.find((x) => x.key === key)
@@ -273,7 +299,7 @@ function casesOf(key) {
 function visibleCases(key) {
   const list = casesOf(key)
   if (filter.value === 'all') return list
-  return list.filter((c) => (filter.value === 'done' ? learned.value.has(c.key) : !learned.value.has(c.key)))
+  return list.filter((c) => (filter.value === 'done' ? hasLearned(c.key) : !hasLearned(c.key)))
 }
 
 /* ---------- 图形 ---------- */
@@ -304,7 +330,7 @@ async function loadProgress() {
     learned.value = await loadCfopProgress(route.params.id)
     tableMissing.value = false
   } catch (err) {
-    learned.value = new Set()
+    learned.value = {}
     tableMissing.value = isMissingTableError(err)
     if (!tableMissing.value) toast.error(err.message)
   } finally {
@@ -324,19 +350,30 @@ async function toggleCase(c) {
     toast.error('没有编辑学员的权限，无法勾选')
     return
   }
-  const next = new Set(learned.value)
-  if (next.has(c.key)) next.delete(c.key)
-  else next.add(c.key)
+  const next = { ...learned.value }
+  if (Object.prototype.hasOwnProperty.call(next, c.key)) delete next[c.key]
+  else next[c.key] = todayStr()
   learned.value = next
   try {
     await saveCfopProgress(route.params.id, next)
   } catch (err) {
     toast.error(err.message)
-    // 回滚
-    const back = new Set(next)
-    if (back.has(c.key)) back.delete(c.key)
-    else back.add(c.key)
-    learned.value = back
+    learned.value = { ...learned.value }
+  }
+}
+
+/** 修正某个情况的「学习日期」 */
+async function setDate(key, value) {
+  if (!canCheck.value) return
+  const next = { ...learned.value }
+  if (!Object.prototype.hasOwnProperty.call(next, key)) return
+  next[key] = value || todayStr()
+  learned.value = next
+  try {
+    await saveCfopProgress(route.params.id, next)
+    toast.success('日期已更新')
+  } catch (err) {
+    toast.error(err.message)
   }
 }
 
@@ -594,17 +631,45 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  min-width: 78px;
   padding: 7px 5px 6px;
   border: 1.5px solid #e5e7eb;
   border-radius: 11px;
   background: #fff;
+  cursor: pointer;
   transition: all 0.15s;
 }
 .cfop-scope .cfop-case:hover {
   border-color: #c9cdd4;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
+}
+.cfop-scope .cfop-case .date,
+.cfop-scope .cfop-case .date-empty {
+  width: 100%;
+  min-height: 15px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  color: #9aa0a6;
+  font-variant-numeric: tabular-nums;
+}
+.cfop-scope .cfop-case .date {
+  cursor: pointer;
+}
+.cfop-scope .cfop-case .date:hover {
+  color: #ea625f;
+}
+.cfop-scope .cfop-case .date::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.cfop-scope .cfop-case.done .date {
+  font-weight: 600;
+  color: #059669;
 }
 .cfop-scope .cfop-case .cl {
   font-size: 11.5px;
