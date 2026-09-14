@@ -42,6 +42,12 @@ const routes = [
         meta: { title: '学习记录', requiresAuth: true, permission: 'student.view' },
       },
       {
+        path: 'students/:id/cfop',
+        name: 'student-cfop',
+        component: () => import('@/views/StudentCfopView.vue'),
+        meta: { title: 'CFOP 学习', requiresAuth: true, permission: 'student.view' },
+      },
+      {
         path: 'resources',
         name: 'resources',
         component: () => import('@/views/ResourcesView.vue'),

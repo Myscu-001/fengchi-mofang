@@ -1,0 +1,651 @@
+<template>
+  <div class="cfop-scope">
+    <PageHeader title="CFOP 学习" :description="headerDesc">
+      <UiButton variant="outline" @click="goBack">
+        <template #icon><ArrowLeft class="size-3.5" /></template>
+        返回学习记录
+      </UiButton>
+      <UiButton v-if="canEditPatterns" variant="outline" @click="toggleEditor">
+        <template #icon><Palette class="size-3.5" /></template>
+        {{ editorOpen ? '收起图案编辑' : '图案编辑' }}
+      </UiButton>
+    </PageHeader>
+
+    <div class="fc-container space-y-5 py-7">
+      <!-- ============ 图案编辑（仅超级管理员） ============ -->
+      <section v-if="editorOpen && canEditPatterns" class="fc-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200 pb-3.5">
+          <h2 class="flex items-center gap-2 text-[15px] font-semibold text-ink-900">
+            <Palette class="size-4 text-brand-500" />图案编辑
+            <span class="text-[12px] font-normal text-ink-400">已涂 {{ patternCount }} / {{ CFOP_TOTAL }}</span>
+          </h2>
+          <div class="flex items-center gap-2">
+            <span v-if="dirty" class="text-[12px] font-medium text-amber-600">有未保存的改动</span>
+            <span v-else-if="savedTip" class="text-[12px] font-medium text-emerald-600">{{ savedTip }}</span>
+            <UiButton size="sm" variant="outline" :disabled="!dirty" @click="resetDraft">放弃改动</UiButton>
+            <UiButton size="sm" variant="primary" :loading="savingPatterns" :disabled="!dirty" @click="savePatterns">
+              保存图案
+            </UiButton>
+          </div>
+        </div>
+
+        <p class="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[12.5px] leading-relaxed text-amber-700">
+          图案是<b>全机构共用</b>的：这里改完保存后，<b>所有学员</b>看到的情况图案都会一起更新。未涂的情况显示占位示意。
+        </p>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <label class="text-[12.5px] text-ink-600">正在编辑</label>
+          <select v-model="edKey" class="fc-input w-auto min-w-[150px]">
+            <optgroup v-for="g in CFOP_GROUPS" :key="g.key" :label="g.title">
+              <option v-for="c in casesOf(g.key)" :key="c.key" :value="c.key">{{ c.title }}</option>
+            </optgroup>
+          </select>
+          <UiButton size="sm" variant="outline" @click="stepCase(-1)">上一个</UiButton>
+          <UiButton size="sm" variant="outline" @click="stepCase(1)">下一个</UiButton>
+          <UiButton size="sm" variant="outline" @click="jumpToUnpainted">跳到未涂的</UiButton>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-8">
+          <div class="min-w-[300px] flex-1">
+            <p class="lbl"><b>① 选颜色</b>（选中后点格子涂色，可按住鼠标拖动连续涂）</p>
+            <div class="flex flex-wrap gap-2 pb-5">
+              <button
+                v-for="col in CFOP_COLORS"
+                :key="col.key"
+                type="button"
+                class="sw"
+                :class="{ on: activeColor === col.key }"
+                :style="{ background: col.hex }"
+                :title="col.name"
+                @click="activeColor = col.key"
+              >
+                <span>{{ col.name }}</span>
+              </button>
+            </div>
+
+            <p class="lbl"><b>② 选视图</b></p>
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="t in CFOP_TEMPLATES"
+                :key="t.value"
+                type="button"
+                class="tpl"
+                :class="{ on: edTpl === t.value }"
+                :title="t.hint"
+                @click="setTemplate(t.value)"
+              >
+                {{ t.label }}
+              </button>
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-1.5">
+              <UiButton size="sm" variant="outline" @click="fillAll('grey')">全部填灰</UiButton>
+              <UiButton size="sm" variant="outline" @click="fillTop('yellow')">顶面填黄</UiButton>
+              <UiButton size="sm" variant="outline" @click="removeCustom">删除该情况的自定义</UiButton>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-start gap-7">
+            <div>
+              <p class="lbl"><b>③ 涂色区</b></p>
+              <div
+                ref="painterEl"
+                v-html="painterHtml"
+                @mousedown="onPaintStart"
+                @mouseover="onPaintOver"
+              />
+            </div>
+            <div>
+              <p class="lbl"><b>清单里的效果</b></p>
+              <div class="flex inline-flex flex-col items-center gap-1.5 rounded-xl border-[1.5px] border-ink-200 p-3">
+                <div v-html="previewHtml" />
+                <span class="text-[11.5px] font-semibold text-ink-500">{{ edCase?.title }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 进度 / 筛选 ============ -->
+      <section class="fc-card p-4">
+        <div class="flex flex-wrap items-center gap-3.5">
+          <div class="text-[13px] text-ink-500">
+            <b class="mr-0.5 text-[26px] text-brand-600 tabular-nums">{{ learnedCount }}</b>
+            / {{ CFOP_TOTAL }}
+          </div>
+          <div class="h-2 min-w-[180px] flex-1 overflow-hidden rounded-full bg-ink-100">
+            <i class="block h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all" :style="{ width: totalPct + '%' }" />
+          </div>
+          <div class="min-w-[52px] text-right text-[13px] text-ink-500">{{ totalPct }}%</div>
+          <div class="ml-auto inline-flex gap-0.5 rounded-[9px] bg-ink-100 p-0.5">
+            <button
+              v-for="f in FILTERS"
+              :key="f.value"
+              type="button"
+              class="h-7 rounded-[7px] px-3 text-[12.5px] transition"
+              :class="filter === f.value ? 'bg-white font-semibold text-brand-600 shadow-sm' : 'text-ink-600'"
+              @click="filter = f.value"
+            >
+              {{ f.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-3.5 grid gap-2.5 sm:grid-cols-3">
+          <div v-for="g in CFOP_GROUPS" :key="g.key" class="rounded-[10px] border border-ink-100 bg-ink-50/40 px-3 py-2.5">
+            <div class="flex items-baseline justify-between">
+              <span class="text-[12.5px] font-semibold text-ink-600">{{ g.title }}</span>
+              <span class="text-[13px] tabular-nums text-ink-800">{{ groupDone(g.key) }} / {{ g.count }}</span>
+            </div>
+            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100">
+              <i class="block h-full rounded-full transition-all" :style="{ width: groupPct(g.key) + '%', background: g.color }" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 数据表未创建 ============ -->
+      <div v-if="tableMissing" class="fc-card p-8 text-center">
+        <TriangleAlert class="mx-auto size-7 text-amber-500" />
+        <h3 class="mt-3 text-[15px] font-semibold text-ink-900">CFOP 学习进度数据表尚未创建</h3>
+        <p class="mx-auto mt-2 max-w-xl text-[13px] leading-relaxed text-ink-500">
+          请在 Supabase 后台的 SQL 编辑器中执行项目里的
+          <code class="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[12px]">supabase/11_cfop_progress.sql</code>
+          ，之后即可勾选。图案部分不受影响。
+        </p>
+      </div>
+
+      <!-- ============ 三组情况 ============ -->
+      <template v-else>
+        <section v-for="g in CFOP_GROUPS" :key="g.key" class="fc-card overflow-hidden">
+          <header class="flex flex-wrap items-center gap-3 border-b border-ink-100 px-4 py-3.5">
+            <h2 class="flex items-center gap-2 text-[15px] font-bold text-ink-900">
+              <span class="size-2.5 rounded-sm" :style="{ background: g.color }" />{{ g.title }}
+            </h2>
+            <span class="text-[12px] text-ink-400">{{ g.desc }}</span>
+            <span class="ml-auto text-[12.5px] tabular-nums text-ink-500">{{ groupDone(g.key) }} / {{ g.count }}</span>
+            <div class="h-1.5 w-[92px] overflow-hidden rounded-full bg-ink-100">
+              <i class="block h-full rounded-full bg-emerald-500 transition-all" :style="{ width: groupPct(g.key) + '%' }" />
+            </div>
+          </header>
+
+          <div class="flex flex-wrap gap-2 p-3.5">
+            <button
+              v-for="c in visibleCases(g.key)"
+              :key="c.key"
+              type="button"
+              class="cfop-case"
+              :class="{ done: learned.has(c.key) }"
+              :title="c.title"
+              @click="toggleCase(c)"
+            >
+              <div v-html="figureFor(c)" />
+              <span class="cl">{{ c.label }}</span>
+              <span class="tick">✓</span>
+              <span v-if="patterns[c.key]" class="cfg" />
+            </button>
+          </div>
+
+          <p v-if="!visibleCases(g.key).length" class="px-4 pb-4 text-[12.5px] text-ink-400">
+            没有符合筛选条件的情况
+          </p>
+        </section>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, Palette, TriangleAlert } from 'lucide-vue-next'
+import PageHeader from '@/components/PageHeader.vue'
+import UiButton from '@/components/UiButton.vue'
+import { getStudent } from '@/api/students'
+import {
+  CFOP_GROUPS,
+  CFOP_TOTAL,
+  CFOP_CASES,
+  CFOP_COLORS,
+  CFOP_TEMPLATES,
+  cfopCaseByKey,
+  tplCellCount,
+  blankCells,
+  defaultCells,
+  placeholderCells,
+  figureHTML,
+  painterHTML,
+} from '@/lib/cfop'
+import {
+  loadCfopPatterns,
+  saveCfopPatterns,
+  loadCfopProgress,
+  saveCfopProgress,
+  isMissingTableError,
+} from '@/api/cfop'
+import { recordAudit } from '@/lib/audit'
+import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const toast = useToastStore()
+
+const FILTERS = [
+  { value: 'all', label: '全部' },
+  { value: 'todo', label: '未掌握' },
+  { value: 'done', label: '已掌握' },
+]
+
+const canEditPatterns = computed(() => auth.can('settings.manage'))
+const canCheck = computed(() => auth.can('student.manage'))
+
+const student = ref(null)
+const learned = ref(new Set())
+const patterns = ref({})
+const tableMissing = ref(false)
+const loading = ref(true)
+const filter = ref('all')
+
+const headerDesc = computed(() => {
+  const name = student.value?.name || '学员'
+  return `${name} · 已掌握 ${learnedCount.value} / ${CFOP_TOTAL} 个 CFOP 情况`
+})
+
+/* ---------- 统计 ---------- */
+const learnedCount = computed(() => {
+  let n = 0
+  for (const c of CFOP_CASES) if (learned.value.has(c.key)) n++
+  return n
+})
+const totalPct = computed(() => Math.round((learnedCount.value / CFOP_TOTAL) * 100))
+function groupDone(key) {
+  return CFOP_CASES.filter((c) => c.group === key && learned.value.has(c.key)).length
+}
+function groupPct(key) {
+  const g = CFOP_GROUPS.find((x) => x.key === key)
+  return g ? Math.round((groupDone(key) / g.count) * 100) : 0
+}
+function casesOf(key) {
+  return CFOP_CASES.filter((c) => c.group === key)
+}
+function visibleCases(key) {
+  const list = casesOf(key)
+  if (filter.value === 'all') return list
+  return list.filter((c) => (filter.value === 'done' ? learned.value.has(c.key) : !learned.value.has(c.key)))
+}
+
+/* ---------- 图形 ---------- */
+function tplOf(c) {
+  return patterns.value[c.key]?.tpl || c.defaultTpl
+}
+function cellsOf(c) {
+  const img = patterns.value[c.key]
+  if (img && Array.isArray(img.cells)) return img.cells
+  return placeholderCells(c.index + 1 + (c.group === 'oll' ? 100 : c.group === 'pll' ? 200 : 0), c.defaultTpl)
+}
+function figureFor(c) {
+  return figureHTML(tplOf(c), cellsOf(c), 13)
+}
+
+/* ---------- 加载 ---------- */
+async function loadStudent() {
+  try {
+    student.value = await getStudent(route.params.id)
+  } catch {
+    student.value = null
+  }
+}
+
+async function loadProgress() {
+  loading.value = true
+  try {
+    learned.value = await loadCfopProgress(route.params.id)
+    tableMissing.value = false
+  } catch (err) {
+    learned.value = new Set()
+    tableMissing.value = isMissingTableError(err)
+    if (!tableMissing.value) toast.error(err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadStudent(), loadProgress()])
+  patterns.value = await loadCfopPatterns()
+  draft.value = JSON.parse(JSON.stringify(patterns.value))
+}
+
+/* ---------- 勾选 ---------- */
+async function toggleCase(c) {
+  if (!canCheck.value) {
+    toast.error('没有编辑学员的权限，无法勾选')
+    return
+  }
+  const next = new Set(learned.value)
+  if (next.has(c.key)) next.delete(c.key)
+  else next.add(c.key)
+  learned.value = next
+  try {
+    await saveCfopProgress(route.params.id, next)
+  } catch (err) {
+    toast.error(err.message)
+    // 回滚
+    const back = new Set(next)
+    if (back.has(c.key)) back.delete(c.key)
+    else back.add(c.key)
+    learned.value = back
+  }
+}
+
+/* ---------- 图案编辑 ---------- */
+const editorOpen = ref(false)
+const draft = ref({})
+const edKey = ref('f2l:1')
+const activeColor = ref('yellow')
+const savingPatterns = ref(false)
+const dirty = ref(false)
+const savedTip = ref('')
+const painting = ref(false)
+const painterEl = ref(null)
+
+const patternCount = computed(() => Object.keys(draft.value || {}).length)
+const edCase = computed(() => cfopCaseByKey(edKey.value))
+const edTpl = computed(() => draft.value[edKey.value]?.tpl || edCase.value?.defaultTpl || 'top9')
+const edCells = computed(() => {
+  const n = tplCellCount(edTpl.value)
+  const img = draft.value[edKey.value]
+  let out
+  if (img && Array.isArray(img.cells)) {
+    out = img.cells.slice(0, n)
+  } else {
+    const c = edCase.value
+    out = c ? cellsOf(c).slice(0, n) : defaultCells(edTpl.value).slice(0, n)
+  }
+  while (out.length < n) out.push('grey')
+  return out
+})
+const painterHtml = computed(() => painterHTML(edTpl.value, edCells.value, 40))
+const previewHtml = computed(() => figureHTML(edTpl.value, edCells.value, 13))
+
+function toggleEditor() {
+  editorOpen.value = !editorOpen.value
+  if (editorOpen.value) {
+    draft.value = JSON.parse(JSON.stringify(patterns.value))
+    dirty.value = false
+  }
+}
+
+function markDirty() {
+  dirty.value = true
+  savedTip.value = ''
+}
+
+function ensureCase(key) {
+  if (!draft.value[key]) {
+    const c = cfopCaseByKey(key)
+    const tpl = c?.defaultTpl || 'top9'
+    draft.value[key] = { tpl, cells: cellsOf(c).slice(0, tplCellCount(tpl)) }
+    while (draft.value[key].cells.length < tplCellCount(tpl)) draft.value[key].cells.push('grey')
+  }
+  return draft.value[key]
+}
+
+function setTemplate(tpl) {
+  const img = ensureCase(edKey.value)
+  const n = tplCellCount(tpl)
+  const cells = (img.cells || []).slice(0, n)
+  while (cells.length < n) cells.push('grey')
+  draft.value[edKey.value] = { tpl, cells }
+  markDirty()
+}
+
+function fillAll(color) {
+  const img = ensureCase(edKey.value)
+  draft.value[edKey.value] = { tpl: img.tpl, cells: new Array(tplCellCount(img.tpl)).fill(color) }
+  markDirty()
+}
+
+function fillTop(color) {
+  const img = ensureCase(edKey.value)
+  const cells = (img.cells || []).slice()
+  while (cells.length < tplCellCount(img.tpl)) cells.push('grey')
+  for (let i = 0; i < 9 && i < cells.length; i++) cells[i] = color
+  draft.value[edKey.value] = { tpl: img.tpl, cells }
+  markDirty()
+}
+
+function removeCustom() {
+  delete draft.value[edKey.value]
+  markDirty()
+}
+
+function stepCase(delta) {
+  const idx = CFOP_CASES.findIndex((c) => c.key === edKey.value)
+  const next = (idx + delta + CFOP_CASES.length) % CFOP_CASES.length
+  edKey.value = CFOP_CASES[next].key
+}
+
+function jumpToUnpainted() {
+  const idx = CFOP_CASES.findIndex((c) => c.key === edKey.value)
+  for (let i = 1; i <= CFOP_CASES.length; i++) {
+    const c = CFOP_CASES[(idx + i) % CFOP_CASES.length]
+    if (!draft.value[c.key]) {
+      edKey.value = c.key
+      return
+    }
+  }
+  toast.success('全部情况都已经涂过了')
+}
+
+function paintAt(i, color) {
+  const img = ensureCase(edKey.value)
+  if (img.cells[i] === color) return
+  img.cells[i] = color
+  markDirty()
+  const el = painterEl.value?.querySelector(`[data-i="${i}"]`)
+  if (el) {
+    if (el.tagName.toLowerCase() === 'polygon') el.setAttribute('fill', CFOP_COLORS.find((c) => c.key === color)?.hex || '#888')
+    else el.style.background = CFOP_COLORS.find((c) => c.key === color)?.hex || '#888'
+  }
+}
+
+function targetIndex(e) {
+  const el = e.target?.closest?.('[data-i]')
+  return el ? parseInt(el.getAttribute('data-i'), 10) : null
+}
+
+function onPaintStart(e) {
+  const i = targetIndex(e)
+  if (i == null) return
+  e.preventDefault()
+  painting.value = true
+  paintAt(i, activeColor.value)
+}
+
+function onPaintOver(e) {
+  if (!painting.value) return
+  const i = targetIndex(e)
+  if (i == null) return
+  paintAt(i, activeColor.value)
+}
+
+async function savePatterns() {
+  savingPatterns.value = true
+  try {
+    await saveCfopPatterns(draft.value)
+    patterns.value = JSON.parse(JSON.stringify(draft.value))
+    dirty.value = false
+    savedTip.value = `已保存 · ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+    recordAudit({
+      action: 'settings',
+      targetType: 'settings',
+      targetId: 'cfop.patterns',
+      summary: `保存 CFOP 情况图案（${patternCount.value} 个自定义）`,
+    })
+    toast.success('图案已保存，所有学员都会看到新图案')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    savingPatterns.value = false
+  }
+}
+
+function resetDraft() {
+  draft.value = JSON.parse(JSON.stringify(patterns.value))
+  dirty.value = false
+  toast.success('已放弃未保存的改动')
+}
+
+/* ---------- 其它 ---------- */
+function goBack() {
+  router.push({ name: 'student-learning', params: { id: route.params.id } })
+}
+
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) loadAll()
+  },
+)
+
+onMounted(() => {
+  window.addEventListener('mouseup', () => {
+    painting.value = false
+  })
+  loadAll()
+})
+</script>
+
+<style>
+/* 图形样式（生成的是 innerHTML，故用非 scoped 样式 + .cfop-scope 前缀隔离） */
+.cfop-scope .fig svg {
+  display: block;
+}
+.cfop-scope .stk {
+  border-radius: 2px;
+}
+.cfop-scope .stk,
+.cfop-scope .pcell {
+  box-shadow: inset 0 0 0 var(--inset, 1px) rgba(0, 0, 0, 0.45);
+}
+.cfop-scope .pcell {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.cfop-scope polygon.po {
+  cursor: pointer;
+}
+.cfop-scope polygon.po:hover {
+  stroke: #ea625f !important;
+  stroke-width: 2.5 !important;
+}
+.cfop-scope .lbl {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.cfop-scope .lbl b {
+  color: #1f2937;
+}
+.cfop-scope .sw {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.12s;
+}
+.cfop-scope .sw:hover {
+  transform: translateY(-1px);
+}
+.cfop-scope .sw.on {
+  border-color: #ea625f;
+  box-shadow: 0 0 0 3px rgba(234, 98, 95, 0.18);
+}
+.cfop-scope .sw span {
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10.5px;
+  color: #9aa0a6;
+}
+.cfop-scope .tpl {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d5d8dd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12.5px;
+  color: #4b5563;
+}
+.cfop-scope .tpl.on {
+  border-color: #ea625f;
+  background: #fff5f5;
+  color: #ea625f;
+  font-weight: 600;
+}
+.cfop-scope .cfop-case {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 5px 6px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 11px;
+  background: #fff;
+  transition: all 0.15s;
+}
+.cfop-scope .cfop-case:hover {
+  border-color: #c9cdd4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
+}
+.cfop-scope .cfop-case .cl {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+.cfop-scope .cfop-case .tick {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.15s;
+}
+.cfop-scope .cfop-case .cfg {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ea625f;
+}
+.cfop-scope .cfop-case.done {
+  border-color: #34d399;
+  background: #f0fdf6;
+}
+.cfop-scope .cfop-case.done .cl {
+  color: #059669;
+}
+.cfop-scope .cfop-case.done .tick {
+  opacity: 1;
+  transform: scale(1);
+}
+</style>

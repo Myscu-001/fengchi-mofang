@@ -5,6 +5,10 @@
         <template #icon><ArrowLeft class="size-3.5" /></template>
         返回档案
       </UiButton>
+      <UiButton variant="outline" @click="goCfop">
+        <template #icon><Puzzle class="size-3.5" /></template>
+        CFOP 学习
+      </UiButton>
       <UiButton v-if="canManageStudent" variant="primary" @click="openAdd">
         <template #icon><Plus class="size-3.5" /></template>
         添加记录
@@ -150,7 +154,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BookOpen, Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen, Pencil, Plus, Puzzle, Search, Trash2, TriangleAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
@@ -248,6 +252,10 @@ async function loadLogs() {
 
 function goBack() {
   router.push({ name: 'student-detail', params: { id: route.params.id } })
+}
+
+function goCfop() {
+  router.push({ name: 'student-cfop', params: { id: route.params.id } })
 }
 
 function openAdd() {

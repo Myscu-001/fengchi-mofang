@@ -66,6 +66,7 @@ export const TABLES = {
   siteSettings: 'site_settings',
   auditLogs: 'audit_logs',
   learningLogs: 'student_learning_logs',
+  cfopProgress: 'cfop_progress',
 }
 
 export const BUCKETS = {
