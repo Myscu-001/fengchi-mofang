@@ -183,17 +183,22 @@
             >
               <div v-html="figureFor(c)" />
               <span class="cl">{{ c.label }}</span>
-              <input
-                v-if="hasLearned(c.key)"
-                type="date"
-                class="date"
-                :value="learned[c.key] || ''"
-                :title="learned[c.key] || '未记录日期，点击可补填'"
-                @click.stop
-                @keydown.stop
-                @change="setDate(c.key, $event.target.value)"
-              />
-              <span v-else class="date-empty" />
+              <span class="date-row">
+                <template v-if="hasLearned(c.key)">
+                  <span class="date-text" :class="{ ph: !learned[c.key] }">
+                    {{ learned[c.key] || '补填日期' }}
+                  </span>
+                  <input
+                    type="date"
+                    class="date-input"
+                    :value="learned[c.key] || ''"
+                    :title="learned[c.key] ? '点击可修改学习日期' : '未记录日期，点击可补填'"
+                    @click.stop
+                    @keydown.stop
+                    @change="setDate(c.key, $event.target.value)"
+                  />
+                </template>
+              </span>
               <span class="tick">✓</span>
               <span v-if="patterns[c.key]" class="cfg" />
             </div>
@@ -632,7 +637,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  min-width: 78px;
+  min-width: 82px;
   padding: 7px 5px 6px;
   border: 1.5px solid #e5e7eb;
   border-radius: 11px;
@@ -645,31 +650,58 @@ onMounted(() => {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
 }
-.cfop-scope .cfop-case .date,
-.cfop-scope .cfop-case .date-empty {
+/* 日期行：文字用 span 居中渲染（原生 date input 的文本靠左，text-align 对其无效），
+   input 做成透明覆盖层，点击整格即可弹出日历 */
+.cfop-scope .cfop-case .date-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  min-height: 15px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  min-height: 16px;
+}
+.cfop-scope .cfop-case .date-text {
+  padding: 0 4px;
+  border-radius: 5px;
   font-size: 10px;
   line-height: 15px;
-  text-align: center;
-  color: #9aa0a6;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #059669;
+  transition: background 0.12s, color 0.12s;
 }
-.cfop-scope .cfop-case .date {
+.cfop-scope .cfop-case .date-text.ph {
+  font-weight: 400;
+  color: #c2c7cd;
+}
+.cfop-scope .cfop-case:hover .date-text {
+  background: #ecfdf5;
+}
+.cfop-scope .cfop-case:hover .date-text.ph {
+  background: #f4f5f7;
+  color: #9aa0a6;
+}
+.cfop-scope .cfop-case .date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
   cursor: pointer;
 }
-.cfop-scope .cfop-case .date:hover {
-  color: #ea625f;
-}
-.cfop-scope .cfop-case .date::-webkit-calendar-picker-indicator {
-  display: none;
-}
-.cfop-scope .cfop-case.done .date {
-  font-weight: 600;
-  color: #059669;
+/* 让日历图标铺满整格：Chrome 点 input 主体不弹日历，只有点 indicator 才会 */
+.cfop-scope .cfop-case .date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .cfop-scope .cfop-case .cl {
   font-size: 11.5px;
