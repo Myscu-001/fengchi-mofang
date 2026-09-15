@@ -238,7 +238,7 @@ import {
   loadCfopPatterns,
   saveCfopPatterns,
   loadCfopProgress,
-  saveCfopProgress,
+  setCfopLearned,
   isMissingTableError,
 } from '@/api/cfop'
 import { recordAudit } from '@/lib/audit'
@@ -301,10 +301,24 @@ function groupPct(key) {
 function casesOf(key) {
   return CFOP_CASES.filter((c) => c.group === key)
 }
+/**
+ * 各组的可见列表缓存。
+ * 原来是普通函数，而模板里调用了两次（v-for + 空列表提示），同一份数据要过滤两遍；
+ * 改成按 group 的 computed 后，筛选条件不变时只算一次。
+ */
+const visibleByGroup = computed(() => {
+  const out = {}
+  for (const g of CFOP_GROUPS) {
+    const list = casesOf(g.key)
+    out[g.key] =
+      filter.value === 'all'
+        ? list
+        : list.filter((c) => (filter.value === 'done' ? hasLearned(c.key) : !hasLearned(c.key)))
+  }
+  return out
+})
 function visibleCases(key) {
-  const list = casesOf(key)
-  if (filter.value === 'all') return list
-  return list.filter((c) => (filter.value === 'done' ? hasLearned(c.key) : !hasLearned(c.key)))
+  return visibleByGroup.value[key] || []
 }
 
 /* ---------- 图形 ---------- */
@@ -316,8 +330,20 @@ function cellsOf(c) {
   if (img && Array.isArray(img.cells)) return img.cells
   return placeholderCells(c.index + 1 + (c.group === 'oll' ? 100 : c.group === 'pll' ? 200 : 0), c.defaultTpl)
 }
+
+/**
+ * 119 张卡片的图形缓存。
+ * 原来每张卡片各调一次 figureHTML 拼 SVG 字符串，且没有缓存——勾一个勾选、切一次筛选
+ * 都会让 119 张全部重算。这里按 case 一次性算好；它只依赖 patterns，
+ * 勾选状态（learned）变化不会触发重算。
+ */
+const figures = computed(() => {
+  const out = {}
+  for (const c of CFOP_CASES) out[c.key] = figureHTML(tplOf(c), cellsOf(c), 13)
+  return out
+})
 function figureFor(c) {
-  return figureHTML(tplOf(c), cellsOf(c), 13)
+  return figures.value[c.key] || ''
 }
 
 /* ---------- 加载 ---------- */
@@ -344,9 +370,15 @@ async function loadProgress() {
 }
 
 async function loadAll() {
-  await Promise.all([loadStudent(), loadProgress()])
-  patterns.value = await loadCfopPatterns()
-  draft.value = JSON.parse(JSON.stringify(patterns.value))
+  // 三个请求并发：Supabase 在新加坡，串行会多出一趟往返（约 200~400ms）
+  await Promise.all([
+    loadStudent(),
+    loadProgress(),
+    loadCfopPatterns().then((p) => {
+      patterns.value = p
+      draft.value = JSON.parse(JSON.stringify(p))
+    }),
+  ])
 }
 
 /* ---------- 勾选 ---------- */
@@ -355,30 +387,40 @@ async function toggleCase(c) {
     toast.error('没有编辑学员的权限，无法勾选')
     return
   }
-  const next = { ...learned.value }
-  if (Object.prototype.hasOwnProperty.call(next, c.key)) delete next[c.key]
-  else next[c.key] = todayStr()
-  learned.value = next
+  const prev = { ...learned.value }
+  const done = hasLearned(c.key)
+  const today = todayStr()
+
+  // 先乐观更新，点下去立刻有反馈，不等网络
+  const optimistic = { ...prev }
+  if (done) delete optimistic[c.key]
+  else optimistic[c.key] = today
+  learned.value = optimistic
+
   try {
-    await saveCfopProgress(route.params.id, next)
+    // 只提交这一个 key 的变更，服务端基于最新值合并后再写回，
+    // 避免把别的老师同时勾选的情况吞掉；返回值同步回本地。
+    learned.value = await setCfopLearned(route.params.id, c.key, done ? null : today)
   } catch (err) {
     toast.error(err.message)
-    learned.value = { ...learned.value }
+    learned.value = prev
   }
 }
 
 /** 修正某个情况的「学习日期」 */
 async function setDate(key, value) {
   if (!canCheck.value) return
-  const next = { ...learned.value }
-  if (!Object.prototype.hasOwnProperty.call(next, key)) return
-  next[key] = value || todayStr()
-  learned.value = next
+  if (!hasLearned(key)) return
+  const prev = { ...learned.value }
+  const nextDate = value || todayStr()
+
+  learned.value = { ...prev, [key]: nextDate }
   try {
-    await saveCfopProgress(route.params.id, next)
+    learned.value = await setCfopLearned(route.params.id, key, nextDate)
     toast.success('日期已更新')
   } catch (err) {
     toast.error(err.message)
+    learned.value = prev
   }
 }
 
