@@ -24,6 +24,7 @@ const sizeClass = computed(
       sm: 'size-8 text-xs',
       md: 'size-10 text-sm',
       lg: 'size-16 text-xl',
+      xl: 'size-20 text-2xl',
     })[props.size] || 'size-10 text-sm',
 )
 

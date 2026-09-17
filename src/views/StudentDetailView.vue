@@ -34,7 +34,37 @@
     <div v-else class="fc-container py-7 space-y-5">
       <!-- 学员基本信息 -->
       <div class="fc-card flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
-        <UiAvatar :src="student.avatar_url" :name="student.name" size="xl" />
+        <div class="flex shrink-0 flex-col items-center gap-2">
+          <UiAvatar :src="student.avatar_url" :name="student.name" size="xl" />
+          <template v-if="canManageStudent">
+            <label
+              class="inline-flex h-7.5 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-2.5 text-[12px] font-medium text-ink-700 transition hover:bg-ink-50"
+              :class="avatarUploading ? 'pointer-events-none opacity-60' : ''"
+            >
+              <Upload class="size-3.5" />
+              {{ avatarUploading ? '上传中…' : '上传头像' }}
+              <input
+                type="file"
+                accept="image/*"
+                class="hidden"
+                :disabled="avatarUploading"
+                @change="handleAvatarUpload"
+              />
+            </label>
+            <button
+              v-if="student.avatar_url"
+              type="button"
+              class="text-[11.5px] text-ink-400 transition hover:text-rose-600 hover:underline disabled:opacity-50"
+              :disabled="avatarUploading"
+              @click="removeAvatar"
+            >
+              移除头像
+            </button>
+            <p class="max-w-[124px] text-center text-[10.5px] leading-tight text-ink-400">
+              支持 JPG / PNG / WebP，大图自动压缩
+            </p>
+          </template>
+        </div>
         <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="text-[18px] font-bold text-ink-900">{{ student.name }}</h2>
@@ -635,7 +665,13 @@ import ResourceIcon from '@/components/ResourceIcon.vue'
 import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
 import { rankForProject, nextRank, rankTiers } from '@/lib/ranks'
 import { formatDate } from '@/lib/format'
-import { getStudent, updateStudent } from '@/api/students'
+import { compressImage } from '@/lib/image'
+import {
+  clearStudentAvatar,
+  getStudent,
+  updateStudent,
+  uploadStudentAvatar,
+} from '@/api/students'
 import {
   listScores,
   scoreStats,
@@ -1163,6 +1199,52 @@ function exportCsv() {
 }
 
 // ===== 学员资料编辑 =====
+/* ---------- 头像 ---------- */
+const avatarUploading = ref(false)
+
+async function handleAvatarUpload(event) {
+  const input = event.target
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!canManageStudent.value) {
+    toast.error('没有编辑学员的权限，无法上传头像')
+    return
+  }
+
+  avatarUploading.value = true
+  try {
+    // 手机/平板现拍的照片动辄好几 MB，先压到桶上限（2MB）以内再传
+    const image = await compressImage(file, { maxEdge: 512, maxBytes: 2 * 1024 * 1024 })
+    const { avatarUrl } = await uploadStudentAvatar(student.value.id, image)
+    student.value = { ...student.value, avatar_url: avatarUrl }
+    toast.success('头像已更新')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+async function removeAvatar() {
+  if (!canManageStudent.value || !student.value?.avatar_url) return
+  const ok = await dialog.confirm({
+    title: '移除头像',
+    message: `确认移除 ${student.value.name} 的头像吗？移除后显示姓名首字。`,
+    confirmText: '移除',
+    danger: true,
+  })
+  if (!ok) return
+
+  try {
+    await clearStudentAvatar(student.value.id)
+    student.value = { ...student.value, avatar_url: null }
+    toast.success('头像已移除')
+  } catch (err) {
+    toast.error(err.message)
+  }
+}
+
 const studentEditOpen = ref(false)
 const studentSaving = ref(false)
 const studentError = ref('')
