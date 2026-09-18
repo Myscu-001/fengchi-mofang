@@ -1,0 +1,50 @@
+{
+  "name": "风驰思维 · 教学管理系统",
+  "short_name": "风驰思维",
+  "description": "魔方与博弈桌游双课程线的机构教学管理系统，面向机构老师。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/fengchi-mofang/",
+  "scope": "/fengchi-mofang/",
+  "id": "/fengchi-mofang/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f8f8f7",
+  "theme_color": "#e8564f",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/fengchi-mofang/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/fengchi-mofang/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/fengchi-mofang/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "学员档案",
+      "short_name": "学员",
+      "url": "/fengchi-mofang/#/students",
+      "icons": [{ "src": "/fengchi-mofang/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "统计分析",
+      "short_name": "统计",
+      "url": "/fengchi-mofang/#/analytics",
+      "icons": [{ "src": "/fengchi-mofang/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

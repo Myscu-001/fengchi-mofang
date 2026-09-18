@@ -724,6 +724,17 @@ onMounted(() => {
   background: #f4f5f7;
   color: #9aa0a6;
 }
+/* 手机上日期行原本只有 16px 高，手指点不准；加高到 26px。
+   卡片会随之变高，网格布局不受影响。 */
+@media (max-width: 640px) {
+  .cfop-scope .cfop-case .date-row {
+    min-height: 26px;
+  }
+  .cfop-scope .cfop-case .date-text {
+    font-size: 11px;
+    line-height: 20px;
+  }
+}
 .cfop-scope .cfop-case .date-input {
   position: absolute;
   inset: 0;

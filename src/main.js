@@ -14,3 +14,13 @@ app.use(router)
 initErrorMonitor(app)
 
 app.mount('#app')
+
+// 注册 Service Worker：网络不稳时回退到缓存的页面外壳，避免断网白屏。
+// 只在生产构建里注册 —— 开发时要避免 SW 把热更新缓存住。
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // 注册失败（隐私模式 / 非 HTTPS / 浏览器不支持）不影响正常使用
+    })
+  })
+}

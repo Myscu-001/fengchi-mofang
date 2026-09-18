@@ -454,10 +454,10 @@
         <!-- 简单模式 -->
         <div v-if="scoreForm.mode === 'simple'" class="grid gap-4 sm:grid-cols-2">
           <UiField label="平均成绩（秒）" required>
-            <input v-model="scoreForm.avgSeconds" type="number" step="0.01" min="0" class="fc-input" placeholder="如 12.34" />
+            <input v-model="scoreForm.avgSeconds" type="number" inputmode="decimal" step="0.01" min="0" class="fc-input" placeholder="如 12.34" />
           </UiField>
           <UiField label="单次最佳（秒）" required>
-            <input v-model="scoreForm.singleBestSeconds" type="number" step="0.01" min="0" class="fc-input" placeholder="如 9.87" />
+            <input v-model="scoreForm.singleBestSeconds" type="number" inputmode="decimal" step="0.01" min="0" class="fc-input" placeholder="如 9.87" />
           </UiField>
         </div>
 
@@ -600,7 +600,7 @@
         </UiField>
         <template v-if="goalForm.type === 'time'">
           <UiField label="目标平均成绩（秒）" required>
-            <input v-model="goalForm.target" type="number" step="0.01" min="0" class="fc-input" placeholder="例：20" />
+            <input v-model="goalForm.target" type="number" inputmode="decimal" step="0.01" min="0" class="fc-input" placeholder="例：20" />
           </UiField>
           <UiField label="起始成绩（秒）" hint="用于计算进度，默认取当前最佳平均">
             <input v-model="goalForm.baseline" type="number" step="0.01" min="0" class="fc-input" />

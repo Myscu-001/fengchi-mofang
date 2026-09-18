@@ -111,7 +111,9 @@
     width: 100%;
     max-width: 1200px;
     margin-inline: auto;
-    padding-inline: 20px;
+    /* 横屏刘海机：左右留出安全区；无刘海时 max() 取 20px，与原来一致 */
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
   }
 
   /* 卡片 */
@@ -198,4 +200,37 @@
 
 .fc-spin {
   animation: fc-spin 0.9s linear infinite;
+}
+
+/* ============================================================
+   移动端适配
+   ============================================================ */
+
+/* 防「聚焦缩放」：iOS Safari 与安卓 Chrome 在输入框字号 < 16px 时，
+   一聚焦就会把整页放大，录成绩时非常难受。统一提到 16px。
+   故意写在 @layer 之外 —— 否则会被 .fc-input 里的 14px（components 层）盖掉。 */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  /* 触控目标：配合手机上的 16px 字号，把输入框内边距加大到约 48px 高
+     （iOS / 安卓人机指南建议触控目标 ≥ 44px）。
+     带 py-* 工具类的紧凑输入框不受影响 —— utilities 层优先级更高。 */
+  @media (max-width: 640px) {
+    .fc-input {
+      padding-block: 11px;
+    }
+  }
+}
+
+@layer utilities {
+  /* 底部安全区：iPhone 的 Home 横条、安卓的手势条会压住内容 */
+  .fc-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

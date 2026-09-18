@@ -1,5 +1,5 @@
 <template>
-  <footer class="mt-16 border-t border-ink-200 bg-white">
+  <footer class="fc-safe-bottom mt-16 border-t border-ink-200 bg-white">
     <div class="fc-container py-10">
       <div class="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>

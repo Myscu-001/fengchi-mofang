@@ -3,8 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="./brand/logo-mark.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover：让页面延伸到刘海/圆角区域，配合底部 safe-area 使用 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#e8564f" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- PWA：添加到主屏后可全屏启动、有自己的图标 -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="风驰思维" />
     <meta
       name="description"
       content="风驰思维 · 机构教学管理系统。魔方与博弈桌游双课程线，面向机构老师的课程、学员、成绩与教学资源一体化管理平台。"
