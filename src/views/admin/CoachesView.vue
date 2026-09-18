@@ -34,7 +34,8 @@
         <UiLoading v-if="loading" text="正在加载师资团队…" />
 
         <div v-else-if="coaches.length" class="overflow-x-auto">
-          <table class="w-full min-w-[860px] text-left text-[13px]">
+          <!-- 桌面端：完整表格（窄屏直接隐藏，由下方卡片接管） -->
+          <table class="hidden w-full min-w-[860px] text-left text-[13px] lg:table">
             <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
               <tr>
                 <th class="px-4 py-3 font-medium">教练</th>
@@ -97,6 +98,68 @@
               </tr>
             </tbody>
           </table>
+
+          <!-- 手机端：每位教练一卡 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li v-for="c in coaches" :key="c.id" class="p-3.5">
+              <div class="flex items-center gap-2.5">
+                <UiAvatar :src="c.avatar_url" :name="c.name" size="md" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <p class="truncate text-[15px] font-semibold text-ink-900">{{ c.name }}</p>
+                    <UiBadge
+                      :label="c.is_active ? '启用' : '停用'"
+                      :custom-class="c.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-ink-100 text-ink-600 border-ink-200'"
+                    />
+                  </div>
+                  <p class="truncate text-[12px] text-ink-400">{{ c.title || '教练' }}</p>
+                </div>
+              </div>
+
+              <div class="mt-3 grid grid-cols-3 gap-1.5 text-center">
+                <div class="rounded-lg bg-ink-50 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">竞技生涯</p>
+                  <p class="truncate text-[13.5px] font-medium text-ink-700">{{ c.years_competing || '—' }}</p>
+                </div>
+                <div class="rounded-lg bg-ink-50 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">教学经验</p>
+                  <p class="truncate text-[13.5px] font-medium text-ink-700">{{ c.years_teaching || '—' }}</p>
+                </div>
+                <div class="rounded-lg bg-ink-50 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">三阶平均</p>
+                  <p class="truncate text-[13.5px] font-medium tabular-nums text-ink-700">{{ c.avg_time || '—' }}</p>
+                </div>
+              </div>
+
+              <div v-if="(c.highlights || []).length" class="mt-2.5 flex flex-wrap gap-1">
+                <span
+                  v-for="h in (c.highlights || []).slice(0, 3)"
+                  :key="h"
+                  class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"
+                >{{ h }}</span>
+                <span v-if="(c.highlights || []).length > 3" class="text-[11px] text-ink-400">+{{ c.highlights.length - 3 }}</span>
+              </div>
+
+              <div class="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-ink-100"
+                  @click="openEdit(c)"
+                >
+                  <Pencil class="size-4" />
+                  编辑资料
+                </button>
+                <button
+                  type="button"
+                  class="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-ink-200 text-red-500 active:bg-red-50"
+                  title="删除教练"
+                  @click="remove(c)"
+                >
+                  <Trash2 class="size-4" />
+                </button>
+              </div>
+            </li>
+          </ul>
         </div>
 
         <UiEmpty v-else :icon="Users" title="没有匹配的教练" description="新增一位教练，开始充实师资团队展示。">

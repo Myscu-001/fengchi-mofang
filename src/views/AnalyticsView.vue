@@ -88,7 +88,8 @@
             <span class="ml-auto text-[12px] text-ink-400">颜色代表段位，越靠下颜色越「高级」；「—」表示暂无该项目成绩</span>
           </div>
 
-          <div class="overflow-x-auto">
+          <!-- 桌面端：成绩矩阵表（手机端由下方卡片接管） -->
+          <div class="hidden overflow-x-auto lg:block">
             <table class="w-full min-w-[760px] text-left text-[13px]">
               <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
                 <tr>
@@ -138,6 +139,42 @@
               </tbody>
             </table>
           </div>
+
+          <!-- 手机端：每人一卡，六个项目的成绩以 3 列网格铺开 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li v-for="row in matrix" :key="row.student.id" class="p-3.5">
+              <button
+                type="button"
+                class="flex w-full items-center gap-2.5 text-left"
+                @click="goStudent(row.student.id)"
+              >
+                <UiAvatar :src="row.student.avatar_url" :name="row.student.name" size="sm" />
+                <span class="text-[15px] font-semibold text-ink-900">{{ row.student.name }}</span>
+                <span class="ml-auto text-[11.5px] text-ink-400">覆盖 {{ row.covered }}/6</span>
+              </button>
+
+              <div class="mt-3 grid grid-cols-3 gap-1.5">
+                <div
+                  v-for="cell in row.cells"
+                  :key="cell.project"
+                  class="flex flex-col items-center rounded-lg px-1 py-2"
+                  :style="cell.value != null
+                    ? (cell.rank
+                      ? { backgroundColor: cell.rank.color + '20', color: cell.rank.color }
+                      : { backgroundColor: '#F1F3F5', color: '#8A9199' })
+                    : { backgroundColor: '#F8F9FB', color: '#BFC5CC' }"
+                >
+                  <span class="w-full truncate text-center text-[10.5px] opacity-80">{{ cubeLabel(cell.project) }}</span>
+                  <span class="mt-0.5 text-[14px] font-semibold tabular-nums">
+                    {{ cell.value != null ? fmtSecShort(cell.value) : '—' }}
+                  </span>
+                  <span v-if="cell.value != null" class="w-full truncate text-center text-[10px] font-medium">
+                    {{ cell.rank ? cell.rank.label : '未达标' }}
+                  </span>
+                </div>
+              </div>
+            </li>
+          </ul>
         </section>
       </template>
 
@@ -169,7 +206,8 @@
             </span>
           </div>
 
-          <div class="overflow-x-auto">
+          <!-- 桌面端：排名表（手机端由下方卡片接管） -->
+          <div class="hidden overflow-x-auto lg:block">
             <table class="w-full min-w-[640px] text-left text-[13px]">
               <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
                 <tr>
@@ -226,6 +264,47 @@
               </tbody>
             </table>
           </div>
+
+          <!-- 手机端：排名卡片，整行可点进学员档案 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li
+              v-for="(row, i) in ranking"
+              :key="row.student.id"
+              class="flex items-center gap-3 p-3.5 active:bg-ink-50"
+              @click="goStudent(row.student.id)"
+            >
+              <span
+                class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-semibold"
+                :class="i < 3 ? rankBadgeClass(i) : 'bg-ink-100 text-ink-500'"
+              >
+                {{ i + 1 }}
+              </span>
+
+              <UiAvatar :src="row.student.avatar_url" :name="row.student.name" size="sm" />
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <p class="truncate text-[15px] font-semibold text-ink-900">{{ row.student.name }}</p>
+                  <UiBadge
+                    v-if="row.student.level"
+                    :label="row.student.level"
+                    custom-class="bg-brand-50 text-brand-700 border-brand-200"
+                  />
+                </div>
+                <p class="mt-1 flex items-center gap-1.5 text-[12px] text-ink-500">
+                  <span
+                    v-if="row.best != null && rankForProject(project, row.best)"
+                    class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                    :style="{ backgroundColor: rankForProject(project, row.best).color }"
+                  >{{ rankForProject(project, row.best).label }}</span>
+                  <span :class="row.best == null ? 'text-ink-400' : 'font-medium text-ink-800 tabular-nums'">
+                    {{ row.best == null ? '暂无成绩' : fmtSec(row.best) }}
+                  </span>
+                  <span class="text-ink-400">· {{ row.count }} 条记录</span>
+                </p>
+              </div>
+            </li>
+          </ul>
         </section>
 
         <!-- 成绩对比 -->
@@ -299,7 +378,8 @@
               所选学员在「{{ projectLabel }}」下暂无足够成绩记录，无法绘制对比曲线
             </p>
 
-            <div class="mt-4 overflow-x-auto">
+            <!-- 桌面端：对比摘要表（手机端由下方卡片接管） -->
+            <div class="mt-4 hidden overflow-x-auto lg:block">
               <table class="w-full min-w-[560px] text-left text-[13px]">
                 <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
                   <tr>
@@ -327,6 +407,32 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- 手机端：对比摘要卡片 -->
+            <ul class="mt-4 divide-y divide-ink-100 rounded-xl border border-ink-200 lg:hidden">
+              <li v-for="s in compareSeries" :key="s.st.id" class="p-3.5">
+                <div class="flex items-center gap-2">
+                  <span class="size-2.5 shrink-0 rounded-full" :style="{ background: s.color }" />
+                  <UiAvatar :src="s.st.avatar_url" :name="s.st.name" size="xs" />
+                  <span class="text-[14px] font-semibold text-ink-800">{{ s.st.name }}</span>
+                  <span class="ml-auto text-[12px] text-ink-400">{{ s.pts.length }} 条</span>
+                </div>
+                <div class="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
+                  <div class="rounded-lg bg-ink-50 py-1.5">
+                    <p class="text-[10.5px] text-ink-400">最高</p>
+                    <p class="text-[13.5px] font-semibold tabular-nums text-ink-700">{{ s.max == null ? '—' : fmtSec(s.max) }}</p>
+                  </div>
+                  <div class="rounded-lg bg-ink-50 py-1.5">
+                    <p class="text-[10.5px] text-ink-400">最低</p>
+                    <p class="text-[13.5px] font-semibold tabular-nums text-ink-700">{{ s.min == null ? '—' : fmtSec(s.min) }}</p>
+                  </div>
+                  <div class="rounded-lg bg-ink-50 py-1.5">
+                    <p class="text-[10.5px] text-ink-400">平均</p>
+                    <p class="text-[13.5px] font-semibold tabular-nums text-ink-800">{{ s.mean == null ? '—' : fmtSec(s.mean) }}</p>
+                  </div>
+                </div>
+              </li>
+            </ul>
           </div>
           <p v-else class="mt-4 text-[13px] text-ink-400">请至少选择 2 名学员开始对比。</p>
         </section>

@@ -38,7 +38,8 @@
         <UiLoading v-if="loading" text="正在加载员工…" />
 
         <div v-else-if="staff.length" class="overflow-x-auto">
-          <table class="w-full min-w-[900px] text-left text-[13px]">
+          <!-- 桌面端：完整表格（窄屏直接隐藏，由下方卡片接管） -->
+          <table class="hidden w-full min-w-[900px] text-left text-[13px] lg:table">
             <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
               <tr>
                 <th class="px-4 py-3 font-medium">员工</th>
@@ -105,6 +106,70 @@
               </tr>
             </tbody>
           </table>
+
+          <!-- 手机端：每位员工一卡 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li v-for="s in staff" :key="s.id" class="p-3.5">
+              <div class="flex items-center gap-2.5">
+                <UiAvatar :src="s.avatar_url" :name="s.full_name" size="md" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <p class="truncate text-[15px] font-semibold text-ink-900">{{ s.full_name || '未填写姓名' }}</p>
+                    <span v-if="s.id === auth.user?.id" class="text-[11px] text-brand-600">（我）</span>
+                    <UiBadge :label="roleLabel(s.role_code)" :custom-class="roleStyle(s.role_code)" />
+                    <UiBadge
+                      :label="s.status === 'active' ? '正常' : '已停用'"
+                      :custom-class="s.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'"
+                    />
+                  </div>
+                  <p class="truncate text-[12px] text-ink-400">{{ s.email }}</p>
+                </div>
+              </div>
+
+              <div class="mt-2.5 grid grid-cols-3 gap-1.5">
+                <div class="min-w-0 rounded-lg bg-ink-50 px-2 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">联系电话</p>
+                  <p class="truncate text-[12.5px] text-ink-700">{{ s.phone || '—' }}</p>
+                </div>
+                <div class="min-w-0 rounded-lg bg-ink-50 px-2 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">开通时间</p>
+                  <p class="truncate text-[12.5px] text-ink-700">{{ formatDate(s.created_at) }}</p>
+                </div>
+                <div class="min-w-0 rounded-lg bg-ink-50 px-2 py-1.5">
+                  <p class="text-[10.5px] text-ink-400">最近登录</p>
+                  <p class="truncate text-[12.5px] text-ink-700">{{ relativeTime(s.last_login_at) }}</p>
+                </div>
+              </div>
+
+              <div class="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-ink-100"
+                  @click="openEdit(s)"
+                >
+                  <Pencil class="size-4" />
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-amber-50"
+                  @click="openReset(s)"
+                >
+                  <KeyRound class="size-4" />
+                  重置密码
+                </button>
+                <button
+                  type="button"
+                  class="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-ink-200 text-red-500 active:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="删除账号"
+                  :disabled="s.id === auth.user?.id"
+                  @click="remove(s)"
+                >
+                  <Trash2 class="size-4" />
+                </button>
+              </div>
+            </li>
+          </ul>
         </div>
 
         <UiEmpty v-else :icon="Users" title="没有匹配的员工" description="换个关键词试试，或者开通一个新的教师账号。">

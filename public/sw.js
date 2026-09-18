@@ -9,7 +9,8 @@
  *   - 跨域请求（Supabase 等）：一律直连，不拦截
  */
 
-const VERSION = 'v1'
+// 每次有构建产物变更就 +1：activate 阶段会据此清掉上一代缓存
+const VERSION = 'v2'
 const SHELL_CACHE = `fc-shell-${VERSION}`
 const ASSET_CACHE = `fc-assets-${VERSION}`
 

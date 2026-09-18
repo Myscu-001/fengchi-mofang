@@ -49,7 +49,8 @@
 
       <!-- 预览 -->
       <div v-if="previewRows.length" class="max-h-64 overflow-auto rounded-xl border border-ink-200">
-        <table class="w-full text-left text-[12px]">
+        <!-- 桌面端：完整表格（窄屏直接隐藏，由下方卡片接管） -->
+        <table class="hidden w-full text-left text-[12px] lg:table">
           <thead class="sticky top-0 bg-ink-50 text-[11.5px] text-ink-500">
             <tr>
               <th v-for="h in previewHeaders" :key="h" class="px-2 py-2 font-medium">{{ h }}</th>
@@ -63,6 +64,24 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- 手机端：每行一卡，按「列名 + 值」左右两列铺开 -->
+        <ul class="divide-y divide-ink-100 lg:hidden">
+          <li v-for="(r, i) in previewRows" :key="i" class="p-2.5" :class="r.error ? 'bg-red-50/60' : ''">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] text-ink-400">第 {{ i + 1 }} 行</span>
+              <span class="text-[11.5px] font-medium" :class="r.error ? 'text-red-600' : 'text-emerald-600'">
+                {{ r.error ? '✕ ' + r.error : '可导入' }}
+              </span>
+            </div>
+            <dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+              <template v-for="h in previewHeaders" :key="h">
+                <dt class="text-[11.5px] text-ink-400">{{ h }}</dt>
+                <dd class="truncate text-[12px]" :class="r.error ? 'text-red-600' : 'text-ink-700'">{{ r.data[h] ?? '' }}</dd>
+              </template>
+            </dl>
+          </li>
+        </ul>
       </div>
 
       <p v-if="previewRows.length" class="text-[12px] text-ink-500">

@@ -60,7 +60,8 @@
 
       <div v-else-if="logs.length" class="fc-card overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[820px] text-left text-[13px]">
+          <!-- 桌面端：完整表格（窄屏直接隐藏，由下方卡片接管） -->
+          <table class="hidden w-full min-w-[820px] text-left text-[13px] lg:table">
             <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
               <tr>
                 <th class="w-40 px-4 py-3 font-medium">时间</th>
@@ -82,6 +83,19 @@
               </tr>
             </tbody>
           </table>
+
+          <!-- 手机端：每条日志一卡 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li v-for="log in logs" :key="log.id" class="px-3.5 py-3">
+              <div class="flex items-center gap-2">
+                <UiBadge :label="auditActionMeta(log.action).label" :custom-class="auditActionMeta(log.action).style" />
+                <span class="truncate text-[12.5px] font-medium text-ink-700">{{ log.actor_name || '—' }}</span>
+                <span class="ml-auto shrink-0 text-[11.5px] tabular-nums text-ink-400">{{ formatDateTime(log.created_at) }}</span>
+              </div>
+              <p class="mt-1.5 text-[13px] text-ink-700">{{ log.summary }}</p>
+              <p class="mt-1 text-[11.5px] text-ink-400">{{ auditTargetLabel(log.target_type) }}</p>
+            </li>
+          </ul>
         </div>
         <div v-if="total > pageSize" class="border-t border-ink-100 p-3.5">
           <UiPagination v-model:page="page" :page-size="pageSize" :total="total" />
