@@ -622,9 +622,13 @@ onMounted(() => {
 .cfop-scope polygon.po {
   cursor: pointer;
 }
-.cfop-scope polygon.po:hover {
-  stroke: #ea625f !important;
-  stroke-width: 2.5 !important;
+/* 悬停反馈只在真正支持悬停的设备（鼠标）上生效。
+   触屏点一下会把 :hover「粘」住，图案会一直保持高亮不褪。 */
+@media (hover: hover) {
+  .cfop-scope polygon.po:hover {
+    stroke: #ea625f !important;
+    stroke-width: 2.5 !important;
+  }
 }
 .cfop-scope .lbl {
   margin-bottom: 8px;
@@ -642,8 +646,10 @@ onMounted(() => {
   border: 2px solid #e5e7eb;
   transition: all 0.12s;
 }
-.cfop-scope .sw:hover {
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .cfop-scope .sw:hover {
+    transform: translateY(-1px);
+  }
 }
 .cfop-scope .sw.on {
   border-color: #ea625f;
@@ -687,10 +693,22 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.15s;
 }
-.cfop-scope .cfop-case:hover {
-  border-color: #c9cdd4;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
+/* 悬停反馈只在鼠标设备上生效：触屏「点一下」会把 :hover 粘住，
+   卡片会一直保持浮起 + 阴影，看起来像被选中了。 */
+@media (hover: hover) {
+  .cfop-scope .cfop-case:hover {
+    border-color: #c9cdd4;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
+  }
+}
+
+/* 触屏设备改用按压反馈：按住时变底色，松手即恢复，不会残留 */
+@media (hover: none) {
+  .cfop-scope .cfop-case:active {
+    border-color: #c9cdd4;
+    background: #fafafa;
+  }
 }
 /* 日期行：文字用 span 居中渲染（原生 date input 的文本靠左，text-align 对其无效），
    input 做成透明覆盖层，点击整格即可弹出日历 */
@@ -717,12 +735,14 @@ onMounted(() => {
   font-weight: 400;
   color: #c2c7cd;
 }
-.cfop-scope .cfop-case:hover .date-text {
-  background: #ecfdf5;
-}
-.cfop-scope .cfop-case:hover .date-text.ph {
-  background: #f4f5f7;
-  color: #9aa0a6;
+@media (hover: hover) {
+  .cfop-scope .cfop-case:hover .date-text {
+    background: #ecfdf5;
+  }
+  .cfop-scope .cfop-case:hover .date-text.ph {
+    background: #f4f5f7;
+    color: #9aa0a6;
+  }
 }
 /* 手机上日期行原本只有 16px 高，手指点不准；加高到 26px。
    卡片会随之变高，网格布局不受影响。 */

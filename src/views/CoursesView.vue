@@ -217,7 +217,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.relative:hover > button {
-  opacity: 1;
+/* 鼠标设备：悬停卡片时才浮出编辑按钮 */
+@media (hover: hover) {
+  .relative:hover > button {
+    opacity: 1;
+  }
+}
+
+/* 触屏设备：本来就没有真正的悬停，按钮改为常显 ——
+   否则编辑按钮要么点不出来，要么被「粘住」的 :hover 弄得不听使唤。 */
+@media (hover: none) {
+  .relative > button {
+    opacity: 1;
+  }
 }
 </style>

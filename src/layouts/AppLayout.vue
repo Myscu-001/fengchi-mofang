@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-screen flex-col bg-ink-50">
+  <div class="fc-tabbar-offset flex min-h-screen flex-col bg-ink-50">
     <!-- 未配置提示 -->
     <div v-if="!configured" class="bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-800">
       <TriangleAlert class="mr-1.5 inline size-3.5" />
@@ -31,6 +31,9 @@
     </main>
 
     <AppFooter :brand="brand" :contact="contact" />
+
+    <!-- 手机端底部快捷导航；lg 及以上自动隐藏，桌面端完全不受影响 -->
+    <AppTabBar />
   </div>
 </template>
 
@@ -40,6 +43,7 @@ import { RouterView } from 'vue-router'
 import { KeyRound, TriangleAlert } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import AppTabBar from '@/components/AppTabBar.vue'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import { ensureRanksLoaded } from '@/lib/ranks'

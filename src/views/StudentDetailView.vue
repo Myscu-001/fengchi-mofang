@@ -236,51 +236,106 @@
 
         <UiLoading v-if="listLoading" text="加载成绩…" />
 
-        <div v-else-if="pagedScores.length" class="overflow-x-auto">
-          <table class="w-full min-w-[640px] text-left text-[13px]">
-            <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
-              <tr>
-                <th class="px-4 py-3 font-medium">日期</th>
-                <th class="px-4 py-3 font-medium">平均成绩</th>
-                <th class="px-4 py-3 font-medium">单次最佳</th>
-                <th class="px-4 py-3 font-medium">模式</th>
-                <th class="px-4 py-3 font-medium">备注</th>
-                <th v-if="canManage" class="px-4 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-ink-100">
-              <tr v-for="row in pagedScores" :key="row.id" class="transition hover:bg-ink-50/60">
-                <td class="px-4 py-3 text-ink-600">{{ formatDate(row.recorded_at) }}</td>
-                <td class="px-4 py-3">
-                  <span class="font-semibold tabular-nums" :class="row.avg_is_dnf ? 'text-red-500' : 'text-brand-700'">
-                    {{ fmtSec(row.avg_seconds, row.avg_is_dnf) }}
-                  </span>
-                  <span v-if="row.avgPB" class="ml-1 inline-flex rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="font-semibold tabular-nums" :class="row.single_is_dnf ? 'text-red-500' : 'text-orange-600'">
-                    {{ fmtSec(row.single_best_seconds, row.single_is_dnf) }}
-                  </span>
-                  <span v-if="row.singlePB" class="ml-1 inline-flex rounded-md bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
-                </td>
-                <td class="px-4 py-3">
-                  <UiBadge :label="row.mode === 'detail' ? '详细' : '简单'" custom-class="border-ink-200 bg-ink-50 text-ink-600" />
-                </td>
-                <td class="px-4 py-3 max-w-[180px] truncate text-ink-500" :title="row.note">{{ row.note || '—' }}</td>
-                <td v-if="canManage" class="px-4 py-3">
-                  <div class="flex justify-end gap-1">
-                    <button class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700" title="编辑" @click="openEdit(row)">
-                      <Pencil class="size-3.5" />
-                    </button>
-                    <button class="rounded-lg p-1.5 text-ink-400 transition hover:bg-red-50 hover:text-red-500" title="删除" @click="remove(row)">
-                      <Trash2 class="size-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <template v-else-if="pagedScores.length">
+          <!-- 桌面端：完整表格（手机端由下方卡片列表接管） -->
+          <div class="hidden overflow-x-auto lg:block">
+            <table class="w-full min-w-[640px] text-left text-[13px]">
+              <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
+                <tr>
+                  <th class="px-4 py-3 font-medium">日期</th>
+                  <th class="px-4 py-3 font-medium">平均成绩</th>
+                  <th class="px-4 py-3 font-medium">单次最佳</th>
+                  <th class="px-4 py-3 font-medium">模式</th>
+                  <th class="px-4 py-3 font-medium">备注</th>
+                  <th v-if="canManage" class="px-4 py-3 text-right font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-ink-100">
+                <tr v-for="row in pagedScores" :key="row.id" class="transition hover:bg-ink-50/60">
+                  <td class="px-4 py-3 text-ink-600">{{ formatDate(row.recorded_at) }}</td>
+                  <td class="px-4 py-3">
+                    <span class="font-semibold tabular-nums" :class="row.avg_is_dnf ? 'text-red-500' : 'text-brand-700'">
+                      {{ fmtSec(row.avg_seconds, row.avg_is_dnf) }}
+                    </span>
+                    <span v-if="row.avgPB" class="ml-1 inline-flex rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="font-semibold tabular-nums" :class="row.single_is_dnf ? 'text-red-500' : 'text-orange-600'">
+                      {{ fmtSec(row.single_best_seconds, row.single_is_dnf) }}
+                    </span>
+                    <span v-if="row.singlePB" class="ml-1 inline-flex rounded-md bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <UiBadge :label="row.mode === 'detail' ? '详细' : '简单'" custom-class="border-ink-200 bg-ink-50 text-ink-600" />
+                  </td>
+                  <td class="px-4 py-3 max-w-[180px] truncate text-ink-500" :title="row.note">{{ row.note || '—' }}</td>
+                  <td v-if="canManage" class="px-4 py-3">
+                    <div class="flex justify-end gap-1">
+                      <button class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700" title="编辑" @click="openEdit(row)">
+                        <Pencil class="size-3.5" />
+                      </button>
+                      <button class="rounded-lg p-1.5 text-ink-400 transition hover:bg-red-50 hover:text-red-500" title="删除" @click="remove(row)">
+                        <Trash2 class="size-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 手机端：把一行记录折成一张卡，成绩字号放大到一眼可读 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li v-for="row in pagedScores" :key="row.id" class="p-3.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-medium text-ink-700">{{ formatDate(row.recorded_at) }}</span>
+                <UiBadge :label="row.mode === 'detail' ? '详细' : '简单'" custom-class="border-ink-200 bg-ink-50 text-ink-600" />
+              </div>
+
+              <div class="mt-2.5 flex items-end gap-6">
+                <div>
+                  <p class="text-[11px] text-ink-400">平均成绩</p>
+                  <p class="mt-0.5 flex items-center gap-1.5">
+                    <span class="text-[19px] leading-none font-semibold tabular-nums" :class="row.avg_is_dnf ? 'text-red-500' : 'text-brand-700'">
+                      {{ fmtSec(row.avg_seconds, row.avg_is_dnf) }}
+                    </span>
+                    <span v-if="row.avgPB" class="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
+                  </p>
+                </div>
+                <div>
+                  <p class="text-[11px] text-ink-400">单次最佳</p>
+                  <p class="mt-0.5 flex items-center gap-1.5">
+                    <span class="text-[19px] leading-none font-semibold tabular-nums" :class="row.single_is_dnf ? 'text-red-500' : 'text-orange-600'">
+                      {{ fmtSec(row.single_best_seconds, row.single_is_dnf) }}
+                    </span>
+                    <span v-if="row.singlePB" class="rounded-md bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">PB</span>
+                  </p>
+                </div>
+              </div>
+
+              <p v-if="row.note" class="mt-2.5 text-[12px] leading-relaxed text-ink-500">{{ row.note }}</p>
+
+              <div v-if="canManage" class="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-ink-100"
+                  @click="openEdit(row)"
+                >
+                  <Pencil class="size-4" />
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-red-500 active:bg-red-50"
+                  @click="remove(row)"
+                >
+                  <Trash2 class="size-4" />
+                  删除
+                </button>
+              </div>
+            </li>
+          </ul>
+        </template>
 
         <div v-else class="px-4 py-10 text-center text-[13px] text-ink-400">
           暂无{{ cubeMeta?.label }}成绩记录，点击「新增成绩」开始录入。

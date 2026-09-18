@@ -50,79 +50,155 @@
       <div class="fc-card mt-5 overflow-hidden">
         <UiLoading v-if="loading" text="正在加载学员…" />
 
-        <div v-else-if="students.length" class="overflow-x-auto">
-          <table class="w-full min-w-[880px] text-left text-[13px]">
-            <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
-              <tr>
-                <th class="px-4 py-3 font-medium">学员</th>
-                <th class="px-4 py-3 font-medium">年龄</th>
-                <th class="px-4 py-3 font-medium">家长 / 联系方式</th>
-                <th class="px-4 py-3 font-medium">学校 / 年级</th>
-                <th class="px-4 py-3 font-medium">水平</th>
-                <th class="px-4 py-3 font-medium">加入时间</th>
-                <th class="px-4 py-3 font-medium">状态</th>
-                <th class="px-4 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-ink-100">
-              <tr v-for="s in students" :key="s.id" class="cursor-pointer transition hover:bg-ink-50/70" @click="openDetail(s)">
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2.5">
-                    <UiAvatar :src="s.avatar_url" :name="s.name" size="sm" />
-                    <div class="min-w-0">
-                      <p class="truncate font-medium text-ink-800 group-hover:text-brand-700">{{ s.name }}</p>
-                      <p v-if="s.nickname" class="truncate text-[11.5px] text-ink-400">{{ s.nickname }}</p>
+        <template v-else-if="students.length">
+          <!-- 桌面端：完整表格（手机端由下方卡片列表接管，表格直接隐藏） -->
+          <div class="hidden overflow-x-auto lg:block">
+            <table class="w-full min-w-[880px] text-left text-[13px]">
+              <thead class="border-b border-ink-200 bg-ink-50 text-[12px] text-ink-500">
+                <tr>
+                  <th class="px-4 py-3 font-medium">学员</th>
+                  <th class="px-4 py-3 font-medium">年龄</th>
+                  <th class="px-4 py-3 font-medium">家长 / 联系方式</th>
+                  <th class="px-4 py-3 font-medium">学校 / 年级</th>
+                  <th class="px-4 py-3 font-medium">水平</th>
+                  <th class="px-4 py-3 font-medium">加入时间</th>
+                  <th class="px-4 py-3 font-medium">状态</th>
+                  <th class="px-4 py-3 text-right font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-ink-100">
+                <tr
+                  v-for="s in students"
+                  :key="s.id"
+                  class="cursor-pointer transition hover:bg-ink-50/70"
+                  @click="openDetail(s)"
+                >
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2.5">
+                      <UiAvatar :src="s.avatar_url" :name="s.name" size="sm" />
+                      <div class="min-w-0">
+                        <p class="truncate font-medium text-ink-800">{{ s.name }}</p>
+                        <p v-if="s.nickname" class="truncate text-[11.5px] text-ink-400">{{ s.nickname }}</p>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-ink-600 tabular-nums">{{ ageOf(s.birthday) }}</td>
-                <td class="px-4 py-3 text-ink-600">
-                  <p>{{ s.guardian_name || '—' }}</p>
-                  <p class="text-[11.5px] text-ink-400">{{ s.guardian_phone || s.phone || '—' }}</p>
-                </td>
-                <td class="px-4 py-3 text-ink-600">
-                  <p>{{ s.school || '—' }}</p>
-                  <p class="text-[11.5px] text-ink-400">{{ s.grade || '—' }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <UiBadge v-if="s.level" :label="s.level" custom-class="bg-brand-50 text-brand-700 border-brand-200" />
-                  <span v-else class="text-ink-400">—</span>
-                </td>
-                <td class="px-4 py-3 text-ink-600">{{ formatDate(s.joined_at) }}</td>
-                <td class="px-4 py-3">
-                  <UiBadge :label="STUDENT_STATUS[s.status]?.label" :custom-class="STUDENT_STATUS[s.status]?.style" />
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex justify-end gap-1" @click.stop>
-                    <RouterLink
-                      :to="{ name: 'student-detail', params: { id: s.id } }"
-                      class="rounded-lg p-1.5 text-ink-400 transition hover:bg-brand-50 hover:text-brand-600"
-                      title="查看完整档案 / 魔方成绩"
-                    >
-                      <Eye class="size-3.5" />
-                    </RouterLink>
-                    <template v-if="canManage">
-                      <button
-                        class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
-                        title="编辑"
-                        @click="openForm(s)"
+                  </td>
+                  <td class="px-4 py-3 text-ink-600 tabular-nums">{{ ageOf(s.birthday) }}</td>
+                  <td class="px-4 py-3 text-ink-600">
+                    <p>{{ s.guardian_name || '—' }}</p>
+                    <p class="text-[11.5px] text-ink-400">{{ s.guardian_phone || s.phone || '—' }}</p>
+                  </td>
+                  <td class="px-4 py-3 text-ink-600">
+                    <p>{{ s.school || '—' }}</p>
+                    <p class="text-[11.5px] text-ink-400">{{ s.grade || '—' }}</p>
+                  </td>
+                  <td class="px-4 py-3">
+                    <UiBadge v-if="s.level" :label="s.level" custom-class="bg-brand-50 text-brand-700 border-brand-200" />
+                    <span v-else class="text-ink-400">—</span>
+                  </td>
+                  <td class="px-4 py-3 text-ink-600">{{ formatDate(s.joined_at) }}</td>
+                  <td class="px-4 py-3">
+                    <UiBadge :label="STUDENT_STATUS[s.status]?.label" :custom-class="STUDENT_STATUS[s.status]?.style" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex justify-end gap-1" @click.stop>
+                      <RouterLink
+                        :to="{ name: 'student-detail', params: { id: s.id } }"
+                        class="rounded-lg p-1.5 text-ink-400 transition hover:bg-brand-50 hover:text-brand-600"
+                        title="查看完整档案 / 魔方成绩"
                       >
-                        <Pencil class="size-3.5" />
-                      </button>
-                      <button
-                        class="rounded-lg p-1.5 text-ink-400 transition hover:bg-red-50 hover:text-red-500"
-                        title="删除"
-                        @click="remove(s)"
-                      >
-                        <Trash2 class="size-3.5" />
-                      </button>
-                    </template>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                        <Eye class="size-3.5" />
+                      </RouterLink>
+                      <template v-if="canManage">
+                        <button
+                          class="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+                          title="编辑"
+                          @click="openForm(s)"
+                        >
+                          <Pencil class="size-3.5" />
+                        </button>
+                        <button
+                          class="rounded-lg p-1.5 text-ink-400 transition hover:bg-red-50 hover:text-red-500"
+                          title="删除"
+                          @click="remove(s)"
+                        >
+                          <Trash2 class="size-3.5" />
+                        </button>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 手机端：卡片列表，纵向排列、字段带标签，彻底摆脱横向滚动 -->
+          <ul class="divide-y divide-ink-100 lg:hidden">
+            <li
+              v-for="s in students"
+              :key="s.id"
+              class="flex cursor-pointer gap-3 p-3.5 active:bg-ink-50"
+              @click="openDetail(s)"
+            >
+              <UiAvatar :src="s.avatar_url" :name="s.name" size="md" />
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="truncate text-[15px] font-semibold text-ink-900">{{ s.name }}</p>
+                  <UiBadge
+                    :label="STUDENT_STATUS[s.status]?.label"
+                    :custom-class="STUDENT_STATUS[s.status]?.style"
+                  />
+                </div>
+
+                <p
+                  v-if="s.nickname || s.birthday || s.level"
+                  class="mt-0.5 truncate text-[12px] text-ink-500"
+                >
+                  {{ [s.nickname, s.birthday ? `${ageOf(s.birthday)} 岁` : '', s.level].filter(Boolean).join(' · ') }}
+                </p>
+
+                <p class="mt-1.5 truncate text-[12px] text-ink-600">
+                  <span class="text-ink-400">家长</span>
+                  {{ s.guardian_name || '—' }}
+                  <span v-if="s.guardian_phone || s.phone">· {{ s.guardian_phone || s.phone }}</span>
+                </p>
+
+                <p v-if="s.school || s.grade" class="mt-0.5 truncate text-[12px] text-ink-600">
+                  <span class="text-ink-400">学校</span>
+                  {{ [s.school, s.grade].filter(Boolean).join(' · ') }}
+                </p>
+
+                <div class="mt-2.5 flex items-center gap-2" @click.stop>
+                  <RouterLink
+                    :to="{ name: 'student-detail', params: { id: s.id } }"
+                    class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-ink-100"
+                  >
+                    <Eye class="size-4" />
+                    查看档案
+                  </RouterLink>
+                  <button
+                    v-if="canManage"
+                    type="button"
+                    class="flex size-10 items-center justify-center rounded-[10px] border border-ink-200 text-ink-500 active:bg-ink-100"
+                    title="编辑"
+                    @click="openForm(s)"
+                  >
+                    <Pencil class="size-4" />
+                  </button>
+                  <button
+                    v-if="canManage"
+                    type="button"
+                    class="flex size-10 items-center justify-center rounded-[10px] border border-ink-200 text-red-500 active:bg-red-50"
+                    title="删除"
+                    @click="remove(s)"
+                  >
+                    <Trash2 class="size-4" />
+                  </button>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </template>
 
         <UiEmpty
           v-else
