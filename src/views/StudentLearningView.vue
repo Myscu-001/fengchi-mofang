@@ -89,6 +89,7 @@
                       <button
                         class="rounded p-1 text-ink-400 transition hover:bg-red-50 hover:text-red-600"
                         title="删除"
+                        v-feedback
                         @click="remove(log)"
                       >
                         <Trash2 class="size-3.5" />

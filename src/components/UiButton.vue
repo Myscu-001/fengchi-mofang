@@ -3,6 +3,7 @@
     :type="type"
     :disabled="disabled || loading"
     class="inline-flex items-center justify-center gap-1.5 rounded-[10px] font-medium whitespace-nowrap transition select-none disabled:cursor-not-allowed disabled:opacity-55"
+    v-feedback
     :class="[sizeClass, variantClass, block ? 'w-full' : '']"
     @click="$emit('click', $event)"
   >

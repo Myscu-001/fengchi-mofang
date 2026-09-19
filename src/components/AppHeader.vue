@@ -140,6 +140,7 @@
           class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-ink-600 transition hover:bg-ink-50"
           active-class="!bg-brand-50 !text-brand-700"
           @click="mobileOpen = false"
+          v-feedback
         >
           <component :is="item.icon" class="size-4 text-ink-400" />
           {{ item.label }}

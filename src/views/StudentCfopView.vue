@@ -72,6 +72,7 @@
                 class="tpl"
                 :class="{ on: edTpl === t.value }"
                 :title="t.hint"
+                v-feedback
                 @click="setTemplate(t.value)"
               >
                 {{ t.label }}

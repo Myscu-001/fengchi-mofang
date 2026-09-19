@@ -11,6 +11,7 @@
         :to="item.to"
         class="fc-tab flex h-[52px] flex-1 flex-col items-center justify-center gap-0.5 text-ink-500 transition-colors active:bg-ink-100"
         active-class="!text-brand-600"
+        v-feedback
       >
         <component :is="item.icon" class="size-[21px]" />
         <span class="text-[10.5px] leading-none font-medium">{{ item.label }}</span>

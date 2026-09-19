@@ -24,9 +24,11 @@
 
     <AppHeader />
 
-    <main class="flex-1">
+    <main class="flex-1 fc-page-clip">
       <RouterView v-slot="{ Component }">
-        <component :is="Component" />
+        <Transition name="fc-page" mode="out-in">
+          <component :is="Component" />
+        </Transition>
       </RouterView>
     </main>
 
