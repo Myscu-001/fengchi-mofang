@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { initErrorMonitor } from './lib/monitor'
+import { initNativeShell } from './lib/native'
 import './style.css'
 
 const app = createApp(App)
@@ -14,6 +15,9 @@ app.use(router)
 initErrorMonitor(app)
 
 app.mount('#app')
+
+// 装成安卓 App 时接管物理返回键（浏览器里这个函数直接返回，不做任何事）
+initNativeShell(router)
 
 // 注册 Service Worker：网络不稳时回退到缓存的页面外壳，避免断网白屏。
 // 只在生产构建里注册 —— 开发时要避免 SW 把热更新缓存住。

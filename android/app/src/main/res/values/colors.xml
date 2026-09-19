@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capacitor 8 模板的 styles.xml 引用了这三个颜色，但模板没有生成 colors.xml，
+         缺失会导致 AAPT 链接失败，必须补上。取值与网站主题色一致。 -->
+    <color name="colorPrimary">#E8564F</color>
+    <color name="colorPrimaryDark">#C94A44</color>
+    <color name="colorAccent">#E8564F</color>
+
+    <!-- 原生外壳的背景色，与 manifest 的 background_color 一致 -->
+    <color name="app_background">#F8F8F7</color>
+</resources>

@@ -1,0 +1,13 @@
+{
+  "appId": "com.fengchi.mofang",
+  "appName": "风驰思维魔方",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
