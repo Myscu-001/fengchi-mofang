@@ -135,9 +135,20 @@
           />
         </UiField>
 
-        <UiField label="标签" hint="多个标签用逗号分隔，可不填">
-          <input v-model="form.tags" class="fc-input" placeholder="公式, 提速, 四阶" />
-        </UiField>
+        <!-- 标签：输入框右侧带「常用标签」下拉。这一行没有用 UiField，
+             因为 UiField 根节点是 <label>，点下拉按钮会连带聚焦输入框（手机上会弹键盘）。 -->
+        <div>
+          <span class="mb-1.5 flex items-center gap-1 text-[13px] font-medium text-ink-700">标签</span>
+          <div class="flex gap-2">
+            <div class="min-w-0 flex-1">
+              <input v-model="form.tags" class="fc-input" placeholder="公式, 提速, 四阶" />
+            </div>
+            <TagPicker v-model="form.tags" :presets="TAG_PRESETS" :history="tagHistory" />
+          </div>
+          <span class="mt-1 block text-xs text-ink-400">
+            多个标签用逗号分隔，可不填；也可点右侧「常用标签」直接选择
+          </span>
+        </div>
 
         <p v-if="errorMsg" class="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700">
           {{ errorMsg }}
@@ -161,7 +172,8 @@ import UiBadge from '@/components/UiBadge.vue'
 import UiField from '@/components/UiField.vue'
 import UiModal from '@/components/UiModal.vue'
 import UiLoading from '@/components/UiLoading.vue'
-import { CUBE_PROJECTS } from '@/lib/dict'
+import TagPicker from '@/components/TagPicker.vue'
+import { CUBE_PROJECTS, TRACKS } from '@/lib/dict'
 import { formatDate } from '@/lib/format'
 import { recordAudit } from '@/lib/audit'
 import { getStudent } from '@/api/students'
@@ -198,6 +210,21 @@ const saving = ref(false)
 const errorMsg = ref('')
 const editing = ref(null)
 const form = reactive({ learnedOn: '', project: '', content: '', tags: '' })
+
+/** 标签快选预设：机构的两条课程线（魔方 / 桌游），配色沿用 dict 里的 TRACKS */
+const TAG_PRESETS = TRACKS.map((t) => ({ value: t.value, label: t.short, color: t.color }))
+
+/** 本学员历史用过的标签（按使用次数由多到少），作为预设之外的候选 */
+const tagHistory = computed(() => {
+  const count = new Map()
+  for (const log of logs.value) {
+    for (const raw of log.tags || []) {
+      const t = String(raw).trim()
+      if (t) count.set(t, (count.get(t) || 0) + 1)
+    }
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t)
+})
 
 function projectLabelOf(value) {
   return CUBE_PROJECTS.find((p) => p.value === value)?.label || value
