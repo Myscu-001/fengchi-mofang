@@ -1,11 +1,12 @@
 <template>
   <div>
     <PageHeader title="学员档案" description="一人一档，记录学员基础信息、状态与成绩轨迹">
-      <UiButton v-if="canView" variant="outline" @click="exportStudents">
+      <!-- 导入 / 导出是电脑上整理数据的活儿，手机端只用「新增学员」，页头保持清爽 -->
+      <UiButton v-if="canView" variant="outline" class="max-lg:hidden" @click="exportStudents">
         <template #icon><Download class="size-4" /></template>
         导出
       </UiButton>
-      <UiButton v-if="canManage" variant="outline" @click="ioOpen = true">
+      <UiButton v-if="canManage" variant="outline" class="max-lg:hidden" @click="ioOpen = true">
         <template #icon><Upload class="size-4" /></template>
         导入
       </UiButton>
@@ -131,71 +132,25 @@
             </table>
           </div>
 
-          <!-- 手机端：卡片列表，纵向排列、字段带标签，彻底摆脱横向滚动 -->
+          <!-- 手机端：卡片列表。只留头像、姓名、状态徽章，整行点进学员自己的页面；
+               编辑 / 删除等操作统一收进学员详情页，列表不再误触。 -->
           <ul class="divide-y divide-ink-100 lg:hidden">
             <li
               v-for="s in students"
               :key="s.id"
-              class="flex cursor-pointer gap-3 p-3.5 active:bg-ink-50"
+              class="flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors active:bg-ink-50"
               @click="openDetail(s)"
             >
               <UiAvatar :src="s.avatar_url" :name="s.name" size="md" />
 
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <p class="truncate text-[15px] font-semibold text-ink-900">{{ s.name }}</p>
-                  <UiBadge
-                    :label="STUDENT_STATUS[s.status]?.label"
-                    :custom-class="STUDENT_STATUS[s.status]?.style"
-                  />
-                </div>
+              <p class="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink-900">{{ s.name }}</p>
 
-                <p
-                  v-if="s.nickname || s.birthday || s.level"
-                  class="mt-0.5 truncate text-[12px] text-ink-500"
-                >
-                  {{ [s.nickname, s.birthday ? `${ageOf(s.birthday)} 岁` : '', s.level].filter(Boolean).join(' · ') }}
-                </p>
+              <UiBadge
+                :label="STUDENT_STATUS[s.status]?.label"
+                :custom-class="STUDENT_STATUS[s.status]?.style"
+              />
 
-                <p class="mt-1.5 truncate text-[12px] text-ink-600">
-                  <span class="text-ink-400">家长</span>
-                  {{ s.guardian_name || '—' }}
-                  <span v-if="s.guardian_phone || s.phone">· {{ s.guardian_phone || s.phone }}</span>
-                </p>
-
-                <p v-if="s.school || s.grade" class="mt-0.5 truncate text-[12px] text-ink-600">
-                  <span class="text-ink-400">学校</span>
-                  {{ [s.school, s.grade].filter(Boolean).join(' · ') }}
-                </p>
-
-                <div class="mt-2.5 flex items-center gap-2" @click.stop>
-                  <RouterLink
-                    :to="{ name: 'student-detail', params: { id: s.id } }"
-                    class="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-ink-200 text-[12.5px] font-medium text-ink-600 active:bg-ink-100"
-                  >
-                    <Eye class="size-4" />
-                    查看档案
-                  </RouterLink>
-                  <button
-                    v-if="canManage"
-                    type="button"
-                    class="flex size-10 items-center justify-center rounded-[10px] border border-ink-200 text-ink-500 active:bg-ink-100"
-                    title="编辑"
-                    @click="openForm(s)"
-                  >
-                    <Pencil class="size-4" />
-                  </button>
-                  <button
-                    v-if="canManage"
-                    type="button"
-                    class="flex size-10 items-center justify-center rounded-[10px] border border-ink-200 text-red-500 active:bg-red-50"
-                    title="删除"
-                    @click="remove(s)"
-                  >
-                    <Trash2 class="size-4" />
-                  </button>
-                </div>
-              </div>
+              <ChevronRight class="size-4.5 flex-none text-ink-300" />
             </li>
           </ul>
         </template>
@@ -311,6 +266,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
+  ChevronRight,
   Download,
   Eye,
   PauseCircle,

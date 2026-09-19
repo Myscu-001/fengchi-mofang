@@ -9,6 +9,7 @@ import { initEdgeSwipeBack } from './lib/gesture'
 import { registerTouchDirectives } from './directives/touch'
 import './style.css'
 import './styles/mobile-native.css'
+import './styles/app-workbench.css'
 
 const app = createApp(App)
 

@@ -43,6 +43,7 @@ const variantClass = computed(
       primary: 'bg-brand-600 text-white shadow-soft hover:bg-brand-700 active:bg-brand-800',
       secondary: 'bg-brand-50 text-brand-700 hover:bg-brand-100',
       outline: 'border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 hover:border-ink-300',
+      'danger-outline': 'border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300',
       ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-800',
       danger: 'bg-red-500 text-white hover:bg-red-600',
       success: 'bg-emerald-500 text-white hover:bg-emerald-600',

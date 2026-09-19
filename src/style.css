@@ -238,9 +238,9 @@
 /* 底部 Tab 栏占位（AppTabBar.vue）：
    给页面垫出「Tab 栏高度 + 底部安全区」，否则页面最底部的内容会被固定栏盖住。
    断点与 Tailwind 的 lg（64rem = 1024px）严格对齐 —— 桌面端这条规则不生效。
-   52px 必须与 AppTabBar.vue 里 Tab 的 h-[52px] 保持一致。 */
+   60px 必须与 styles/app-workbench.css 里 .fc-tabbar-row 的 height 保持一致。 */
 @media (width < 64rem) {
   .fc-tabbar-offset {
-    padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   }
 }

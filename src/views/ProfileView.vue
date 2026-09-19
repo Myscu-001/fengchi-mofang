@@ -1,6 +1,12 @@
 <template>
   <div>
-    <PageHeader title="个人中心" description="维护个人资料与登录密码" />
+    <PageHeader title="个人中心" description="维护个人资料与登录密码">
+      <!-- 手机端首页工作台不再显示顶栏，退出登录统一收在这里 -->
+      <UiButton variant="outline" class="lg:hidden" @click="handleSignOut">
+        <template #icon><LogOut class="size-4" /></template>
+        退出登录
+      </UiButton>
+    </PageHeader>
 
     <div class="fc-container py-7">
       <div class="grid gap-5 lg:grid-cols-[1fr_340px]">
@@ -183,7 +189,8 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Copy, Eye, EyeOff, Trash2, Upload } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Check, Copy, Eye, EyeOff, LogOut, Trash2, Upload } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
@@ -191,6 +198,7 @@ import UiAvatar from '@/components/UiAvatar.vue'
 import UiField from '@/components/UiField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { useDialogStore } from '@/stores/dialog'
 import { roleLabel, roleStyle } from '@/lib/permissions'
 import { formatDate, relativeTime } from '@/lib/format'
 import { listPermissions } from '@/api/users'
@@ -198,6 +206,8 @@ import { listErrors, clearErrors } from '@/lib/monitor'
 
 const auth = useAuthStore()
 const toast = useToastStore()
+const dialog = useDialogStore()
+const router = useRouter()
 
 const uploadingAvatar = ref(false)
 const savingProfile = ref(false)
@@ -210,6 +220,19 @@ const errorLogs = ref([])
 
 const profileForm = reactive({ full_name: '', title: '', phone: '', bio: '' })
 const pwdForm = reactive({ password: '', confirm: '' })
+
+/** 退出登录（手机端顶栏被工作台让位后，这里是唯一的退出入口） */
+async function handleSignOut() {
+  const ok = await dialog.confirm({
+    title: '退出登录',
+    message: '确定要退出当前账号吗？',
+    confirmText: '退出',
+  })
+  if (!ok) return
+  await auth.signOut()
+  toast.success('已退出登录')
+  router.push({ name: 'login' })
+}
 
 const MODULE_LABELS = {
   system: '系统管理',

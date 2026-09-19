@@ -1,5 +1,8 @@
 <template>
-  <header class="sticky top-0 z-50 border-b border-ink-200 bg-white/85 backdrop-blur-md">
+  <header
+    class="sticky top-0 z-50 border-b border-ink-200 bg-white/85 backdrop-blur-md"
+    :class="hideOnMobile ? 'max-lg:hidden' : ''"
+  >
     <div class="fc-container flex h-15 items-center gap-4">
       <RouterLink :to="{ name: 'home' }" class="shrink-0">
         <LogoMark :brand="site.brand" />
@@ -216,6 +219,11 @@ const navItems = computed(() =>
 const adminItems = computed(() => adminDefs.filter((i) => auth.can(i.perm)))
 const allMobileItems = computed(() => [...navItems.value, ...adminItems.value])
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+
+/* 手机端首页是 App 工作台（自带页头和右上角 logo），这里让位，避免出现两条顶栏。
+   其它页面在手机端仍保留顶栏（汉堡菜单 / 头像 / 退出登录都在里面）。
+   桌面端不受影响。 */
+const hideOnMobile = computed(() => route.name === 'home')
 
 function handleOutsideClick(event) {
   if (userRef.value && !userRef.value.contains(event.target)) userOpen.value = false

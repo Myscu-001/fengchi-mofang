@@ -1,5 +1,9 @@
 <template>
-  <div>
+  <!-- 手机端（< lg）：只渲染 App 工作台图标页；桌面端完全不受影响，仍渲染下面的官网首页。
+       两套结构互斥，手机端不会白挂载官网首页那一大堆数据请求。 -->
+  <AppWorkbench v-if="showWorkbench" />
+
+  <div v-else>
     <!-- ============ 首屏 ============ -->
     <section class="fc-cube-bg border-b border-ink-200 bg-white">
       <div class="fc-container py-12 lg:py-16">
@@ -462,8 +466,10 @@ import UiBadge from '@/components/UiBadge.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
 import ResourceIcon from '@/components/ResourceIcon.vue'
 import TrackDot from '@/components/TrackDot.vue'
+import AppWorkbench from '@/components/AppWorkbench.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSiteStore } from '@/stores/site'
+import { useIsMobile } from '@/lib/useMediaQuery'
 import { COURSE_STATUS } from '@/lib/dict'
 import { assetUrl } from '@/lib/assets'
 import { formatDuration, formatFileSize, relativeTime } from '@/lib/format'
@@ -473,6 +479,11 @@ import { listCoaches } from '@/api/coaches'
 const auth = useAuthStore()
 const site = useSiteStore()
 const router = useRouter()
+
+/* 手机端首页 = App 工作台（图标入口）；未登录时仍展示官网首页，保留登录入口。
+   桌面端（≥ lg）恒为 false，官网首页原样不动。 */
+const isMobile = useIsMobile()
+const showWorkbench = computed(() => isMobile.value && auth.isLoggedIn)
 
 const coaches = ref([])
 const stats = ref({})

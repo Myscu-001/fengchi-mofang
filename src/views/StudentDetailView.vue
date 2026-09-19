@@ -17,6 +17,16 @@
         <template #icon><UserCog class="size-4" /></template>
         编辑资料
       </UiButton>
+      <!-- 学员列表页的编辑/删除入口已收进本页（列表只留头像+姓名+状态） -->
+      <UiButton
+        v-if="canManageStudent && student"
+        variant="danger-outline"
+        :loading="deletingStudent"
+        @click="removeStudent"
+      >
+        <template #icon><Trash2 class="size-4" /></template>
+        删除学员
+      </UiButton>
     </PageHeader>
 
     <div v-if="loading" class="fc-container py-7">
@@ -723,6 +733,7 @@ import { formatDate } from '@/lib/format'
 import { compressImage } from '@/lib/image'
 import {
   clearStudentAvatar,
+  deleteStudent,
   getStudent,
   updateStudent,
   uploadStudentAvatar,
@@ -1302,6 +1313,7 @@ async function removeAvatar() {
 
 const studentEditOpen = ref(false)
 const studentSaving = ref(false)
+const deletingStudent = ref(false)
 const studentError = ref('')
 const studentForm = reactive({
   name: '', nickname: '', gender: 'unknown', birthday: '', guardian_name: '', guardian_phone: '', level: '', status: 'active', notes: '',
@@ -1343,6 +1355,36 @@ async function saveStudent() {
     studentError.value = err.message
   } finally {
     studentSaving.value = false
+  }
+}
+
+// ===== 删除学员 =====
+/* 列表页的删除入口已收进本页（手机端列表只留头像/姓名/状态），避免误触。 */
+async function removeStudent() {
+  if (!student.value) return
+  const target = student.value
+  const ok = await dialog.confirm({
+    title: '删除学员',
+    message: `确认删除「${target.name}」吗？其成绩与学习记录也会一并删除，且不可恢复。`,
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  deletingStudent.value = true
+  try {
+    await deleteStudent(target.id)
+    recordAudit({
+      action: 'delete',
+      targetType: 'student',
+      targetId: target.id,
+      summary: `删除学员「${target.name}」`,
+    })
+    toast.success('学员已删除')
+    router.push({ name: 'students' })
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    deletingStudent.value = false
   }
 }
 
