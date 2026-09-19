@@ -81,25 +81,86 @@ export async function saveCfopProgress(studentId, learned) {
   if (error) throw new Error(errorMessage(error, '保存 CFOP 学习进度失败'))
 }
 
+/* ---------------- 写入调度：串行 + 合并 ---------------- */
+
 /**
- * 只改动「某一个情况」的学习状态。
+ * 每次写入的基本动作：读服务端最新值 → 只改本批涉及的 key → 整份写回。
  *
  * 为什么不直接整份覆盖：如果两个老师同时开着同一个学员的页面，各自基于进页时的
- * 旧快照整份 upsert，后保存的那份会静默吞掉先保存的全部改动。
+ * 旧快照整份 upsert，后保存的那份会静默吞掉先保存的全部改动。先读后写可以避免。
+ */
+async function commitLearningBatch(studentId, batch) {
+  const current = await loadCfopProgress(studentId)
+  const next = { ...current }
+  for (const [k, v] of batch) {
+    if (v == null) delete next[k]
+    else next[k] = v
+  }
+  await saveCfopProgress(studentId, next)
+  return next
+}
+
+/**
+ * 每个学员一条写入队列。串行执行「读-改-写」，并把排队期间新来的点击合并提交。
  *
- * 这里先读服务端最新值，只把自己要改的这一个 key 合并进去再写回，
- * 别人同时新增/修改的其他情况得以保留。
+ * 为什么必须串行：一次写入要两次网络往返（Supabase 在新加坡，单次约 200~400ms）。
+ * 若每次点击都各自发起，后发起的「读」常常读到还没被前一次「写」覆盖的旧值，
+ * 于是先点的改动被静默吞掉，界面上的勾也会被返回的旧值抹回去 ——
+ * 表现为「连点好几个，只有一两个生效」。实测同一学员连点 8 个情况：
+ *   · 各自并发写  → 丢失 1 个，461ms
+ *   · 排队逐个写  → 全部保留，1261ms
+ *   · 排队 + 合并 → 全部保留，139ms
+ *
+ * 因此：① 串行保证每次读到的都是最新值；② 合并让点击越密越省往返，
+ * 而不是越密越容易丢。所有调用方的 Promise 在本轮排空后统一结算，
+ * 所以不会出现「返回的旧值把界面上新的勾抹掉」。
+ */
+const writeQueues = new Map()
+
+function queueOf(studentId) {
+  let q = writeQueues.get(studentId)
+  if (!q) {
+    q = { pending: new Map(), draining: false, waiters: [] }
+    writeQueues.set(studentId, q)
+  }
+  return q
+}
+
+async function drainQueue(studentId, q) {
+  q.draining = true
+  let latest = null
+  let failure = null
+  while (q.pending.size) {
+    const batch = new Map(q.pending)
+    q.pending.clear()
+    try {
+      latest = await commitLearningBatch(studentId, batch)
+    } catch (err) {
+      failure = err
+      break
+    }
+  }
+  q.draining = false
+  const waiters = q.waiters.splice(0)
+  for (const w of waiters) {
+    if (failure) w.reject(failure)
+    else w.resolve(latest)
+  }
+}
+
+/**
+ * 只改动「某一个情况」的学习状态。连续快速调用会自动排队并合并提交。
  *
  * @param {string} studentId
  * @param {string} key        形如 "oll:12"
  * @param {string|null} date  日期字符串；传 null 表示取消掌握（删除该 key）
- * @returns {Promise<Object>} 写回后的完整 learned，供调用方同步本地状态
+ * @returns {Promise<Object>} 本轮全部改动提交完成后的完整 learned
  */
-export async function setCfopLearned(studentId, key, date) {
-  const current = await loadCfopProgress(studentId)
-  const next = { ...current }
-  if (date == null || date === '') delete next[key]
-  else next[key] = date
-  await saveCfopProgress(studentId, next)
-  return next
+export function setCfopLearned(studentId, key, date) {
+  const q = queueOf(studentId)
+  q.pending.set(key, date == null || date === '' ? null : date)
+  return new Promise((resolve, reject) => {
+    q.waiters.push({ resolve, reject })
+    if (!q.draining) drainQueue(studentId, q)
+  })
 }

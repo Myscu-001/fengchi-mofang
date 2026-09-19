@@ -387,23 +387,27 @@ async function toggleCase(c) {
     toast.error('没有编辑学员的权限，无法勾选')
     return
   }
-  const prev = { ...learned.value }
   const done = hasLearned(c.key)
   const today = todayStr()
+  const prevDate = learned.value[c.key]
 
   // 先乐观更新，点下去立刻有反馈，不等网络
-  const optimistic = { ...prev }
+  const optimistic = { ...learned.value }
   if (done) delete optimistic[c.key]
   else optimistic[c.key] = today
   learned.value = optimistic
 
   try {
-    // 只提交这一个 key 的变更，服务端基于最新值合并后再写回，
-    // 避免把别的老师同时勾选的情况吞掉；返回值同步回本地。
+    // 提交会按学员排队、并把排队期间的连点合并成一次请求（见 api/cfop.js）。
+    // 返回值是本轮排空后的完整状态，必定包含期间点过的所有情况，可直接采用。
     learned.value = await setCfopLearned(route.params.id, c.key, done ? null : today)
   } catch (err) {
     toast.error(err.message)
-    learned.value = prev
+    // 只回滚这一个情况：连点期间成功提交的其它情况不能被一起抹掉
+    const rollback = { ...learned.value }
+    if (prevDate) rollback[c.key] = prevDate
+    else delete rollback[c.key]
+    learned.value = rollback
   }
 }
 
@@ -411,16 +415,20 @@ async function toggleCase(c) {
 async function setDate(key, value) {
   if (!canCheck.value) return
   if (!hasLearned(key)) return
-  const prev = { ...learned.value }
+  const prevDate = learned.value[key]
   const nextDate = value || todayStr()
 
-  learned.value = { ...prev, [key]: nextDate }
+  learned.value = { ...learned.value, [key]: nextDate }
   try {
     learned.value = await setCfopLearned(route.params.id, key, nextDate)
     toast.success('日期已更新')
   } catch (err) {
     toast.error(err.message)
-    learned.value = prev
+    // 同上：只回滚这一个情况
+    const rollback = { ...learned.value }
+    if (prevDate) rollback[key] = prevDate
+    else delete rollback[key]
+    learned.value = rollback
   }
 }
 
