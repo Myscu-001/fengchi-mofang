@@ -32,7 +32,8 @@
       </RouterView>
     </main>
 
-    <AppFooter :brand="brand" :contact="contact" />
+    <!-- 手机端首页是 App 工作台，不放官网页脚，免得像网页 */
+    <AppFooter :class="isHomeRoute ? 'max-lg:hidden' : ''" :brand="brand" :contact="contact" />
 
     <!-- 手机端底部快捷导航；lg 及以上自动隐藏，桌面端完全不受影响 -->
     <AppTabBar />
@@ -41,7 +42,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import { KeyRound, TriangleAlert } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -51,7 +52,11 @@ import { useAuthStore } from '@/stores/auth'
 import { ensureRanksLoaded } from '@/lib/ranks'
 
 const auth = useAuthStore()
+const route = useRoute()
 const configured = isSupabaseConfigured
+
+/* 手机端首页 = App 工作台，页脚（官网页脚）在手机端隐藏，桌面端照旧 */
+const isHomeRoute = computed(() => route.name === 'home')
 
 const brand = ref({ name: '风驰思维魔方', full_name: '', slogan: '' })
 const contact = ref({})
