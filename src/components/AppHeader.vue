@@ -220,10 +220,13 @@ const adminItems = computed(() => adminDefs.filter((i) => auth.can(i.perm)))
 const allMobileItems = computed(() => [...navItems.value, ...adminItems.value])
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
-/* 手机端首页是 App 工作台（自带页头和右上角 logo），这里让位，避免出现两条顶栏。
-   其它页面在手机端仍保留顶栏（汉堡菜单 / 头像 / 退出登录都在里面）。
+/* 手机端登录后彻底隐藏这条全站顶栏，App 里每个页面用自己的 PageHeader 当页头：
+   · 首页 = App 工作台（自带标题 + 右上角 logo）；
+   · 二级页面（学员详情 / 学习记录 / CFOP / 课程详情）的 PageHeader 右侧都带「返回」；
+   · 其余入口走底部 Tab 栏 + 首页图标网格，用不到汉堡菜单。
+   未登录时不隐藏 —— 手机端逛官网还得靠这里的「进入系统」按钮。
    桌面端不受影响。 */
-const hideOnMobile = computed(() => route.name === 'home')
+const hideOnMobile = computed(() => auth.isLoggedIn)
 
 function handleOutsideClick(event) {
   if (userRef.value && !userRef.value.contains(event.target)) userOpen.value = false

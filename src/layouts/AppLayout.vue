@@ -32,8 +32,9 @@
       </RouterView>
     </main>
 
-    <!-- 手机端首页是 App 工作台，不放官网页脚，免得像网页 */
-    <AppFooter :class="isHomeRoute ? 'max-lg:hidden' : ''" :brand="brand" :contact="contact" />
+    <!-- 手机端登录后不显示官网页脚：App 里页面以固定底栏收尾，免得像网页；
+         未登录逛官网时保留页脚。桌面端照旧。 -->
+    <AppFooter :class="hideWebChrome ? 'max-lg:hidden' : ''" :brand="brand" :contact="contact" />
 
     <!-- 手机端底部快捷导航；lg 及以上自动隐藏，桌面端完全不受影响 -->
     <AppTabBar />
@@ -42,7 +43,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView } from 'vue-router'
 import { KeyRound, TriangleAlert } from 'lucide-vue-next'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
@@ -52,11 +53,11 @@ import { useAuthStore } from '@/stores/auth'
 import { ensureRanksLoaded } from '@/lib/ranks'
 
 const auth = useAuthStore()
-const route = useRoute()
 const configured = isSupabaseConfigured
 
-/* 手机端首页 = App 工作台，页脚（官网页脚）在手机端隐藏，桌面端照旧 */
-const isHomeRoute = computed(() => route.name === 'home')
+/* 手机端登录后隐藏「官网页脚」这类网页痕迹（顶栏同理，见 AppHeader.vue）。
+   判断依据是登录态而非路由：未登录时看到的是官网，页脚该在；登录后就是 App 了。 */
+const hideWebChrome = computed(() => auth.isLoggedIn)
 
 const brand = ref({ name: '风驰思维魔方', full_name: '', slogan: '' })
 const contact = ref({})

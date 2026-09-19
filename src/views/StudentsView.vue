@@ -132,8 +132,8 @@
             </table>
           </div>
 
-          <!-- 手机端：卡片列表。只留头像、姓名、状态徽章，整行点进学员自己的页面；
-               编辑 / 删除等操作统一收进学员详情页，列表不再误触。 -->
+          <!-- 手机端：卡片列表。头像 + 姓名 + 状态徽章，姓名下面一行灰色小字（小名 / 年龄 / 段位）
+               用来分辨重名；整行点进学员自己的页面，编辑 / 删除等操作统一收进学员详情页，列表不再误触。 -->
           <ul class="divide-y divide-ink-100 lg:hidden">
             <li
               v-for="s in students"
@@ -143,12 +143,19 @@
             >
               <UiAvatar :src="s.avatar_url" :name="s.name" size="md" />
 
-              <p class="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink-900">{{ s.name }}</p>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="truncate text-[15px] font-semibold text-ink-900">{{ s.name }}</p>
+                  <UiBadge
+                    :label="STUDENT_STATUS[s.status]?.label"
+                    :custom-class="STUDENT_STATUS[s.status]?.style"
+                  />
+                </div>
 
-              <UiBadge
-                :label="STUDENT_STATUS[s.status]?.label"
-                :custom-class="STUDENT_STATUS[s.status]?.style"
-              />
+                <p v-if="sublineOf(s)" class="mt-0.5 truncate text-[12px] text-ink-400">
+                  {{ sublineOf(s) }}
+                </p>
+              </div>
 
               <ChevronRight class="size-4.5 flex-none text-ink-300" />
             </li>
@@ -347,6 +354,15 @@ const blank = () => ({
 })
 
 const form = reactive(blank())
+
+/* 手机卡片里姓名下面那行灰色小字：小名 / 年龄 / 段位，有哪个显示哪个（都没有就不占地方）。
+   只取这三样 —— 家长、学校之类的在详情页看，列表一行小字够分辨重名就行。 */
+function sublineOf(s) {
+  const age = s.birthday ? ageOf(s.birthday) : ''
+  return [s.nickname, age && age !== '—' ? `${age} 岁` : '', s.level]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 function ageOf(birthday) {
   if (!birthday) return '—'
