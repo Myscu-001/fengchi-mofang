@@ -4,7 +4,8 @@
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#E8564F"
   },
   "server": {
     "url": "https://myscu-001.github.io/fengchi-mofang/",

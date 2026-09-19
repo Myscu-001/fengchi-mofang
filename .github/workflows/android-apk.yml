@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android Release
 
 # 为什么放在云端构建：GitHub 的 ubuntu 运行器自带 Android SDK 与 JDK，
 # 仓库是 public → Actions 分钟数免费。这样本机不需要装 JDK / SDK / Android Studio。
@@ -12,6 +12,13 @@ on:
           - online
           - bundled
         default: online
+      buildType:
+        description: 构建类型
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
 
   push:
     branches: [main]
@@ -22,15 +29,20 @@ on:
       - 'capacitor.config.bundled.json'
       - 'package.json'
       - 'package-lock.json'
+      - 'public/version.json'
 
 permissions:
   contents: write
 
 jobs:
-  apk:
+  build:
     runs-on: ubuntu-latest
     env:
+      # push 触发时取不到 inputs，用 || 兜底为 online / release
       APP_MODE: ${{ github.event.inputs.mode || 'online' }}
+      BUILD_TYPE: ${{ github.event.inputs.buildType || 'release' }}
+      # versionCode 用工作流运行号，保证每次出包单调递增且唯一
+      VERSION_CODE: ${{ github.run_number }}
     steps:
       - name: 取代码
         uses: actions/checkout@v4
@@ -56,7 +68,7 @@ jobs:
 
       - name: 按模式准备配置
         run: |
-          echo "打包方式 = $APP_MODE"
+          echo "打包方式 = $APP_MODE / 构建类型 = $BUILD_TYPE"
           if [ "$APP_MODE" = "bundled" ]; then
             # 本地打包：去掉 server.url，资源从 App 内部读，base 必须是根路径
             cp capacitor.config.bundled.json capacitor.config.json
@@ -65,8 +77,14 @@ jobs:
             # 在线壳：App 直接打开线上网址
             echo "VITE_BASE=/fengchi-mofang/" >> "$GITHUB_ENV"
           fi
-          echo "--- 生效的 capacitor.config.json ---"
-          cat capacitor.config.json
+
+      - name: 写入版本名（取自 package.json）
+        run: echo "VERSION_NAME=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: 写入版本清单（供 App 内「检查更新」使用）
+        run: |
+          node -e "const p=require('./package.json');const fs=require('fs');fs.writeFileSync('public/version.json',JSON.stringify({version:p.version,build:process.env.VERSION_CODE,apk:'https://github.com/Myscu-001/fengchi-mofang/releases/tag/apk-latest'},null,2))"
+          echo "--- version.json ---"; cat public/version.json
 
       - name: 构建前端
         run: npm run build
@@ -78,37 +96,53 @@ jobs:
         run: |
           echo "ANDROID_HOME = $ANDROID_HOME"
           SDKMGR="$(command -v sdkmanager || echo "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager")"
-          echo "sdkmanager = $SDKMGR"
           yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
           "$SDKMGR" --install "platforms;android-36" "platform-tools" > /dev/null 2>&1 || true
-          echo "--- 已安装的平台 ---"
-          ls "$ANDROID_HOME/platforms" || true
+          echo "--- 已安装的平台 ---"; ls "$ANDROID_HOME/platforms" || true
 
-      - name: 打包 APK
+      - name: 准备签名密钥
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "使用仓库 Secret 提供的签名密钥"
+            echo "$KEYSTORE_BASE64" | base64 -d > android/release-keystore.jks
+          else
+            echo "未配置 KEYSTORE_BASE64，生成临时调试密钥仅用于验证构建（不能上架）"
+            keytool -genkeypair -v -keystore android/release-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias androiddebugkey -storepass android -keypass android -dname "CN=Dev,OU=Dev,O=Dev,L=Dev,S=Dev,C=CN"
+          fi
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: 打包 APK / AAB
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          if [ "$BUILD_TYPE" = "release" ]; then
+            ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+          else
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          fi
 
       - name: 整理产物
         run: |
           mkdir -p out
-          if [ "$APP_MODE" = "bundled" ]; then
-            NAME="fengchi-mofang-bundled.apk"
+          if [ "$APP_MODE" = "bundled" ]; then SUFFIX="-bundled"; else SUFFIX="-online"; fi
+          if [ "$BUILD_TYPE" = "release" ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk "out/fengchi-mofang${SUFFIX}.apk"
+            cp android/app/build/outputs/bundle/release/app-release.aab "out/fengchi-mofang${SUFFIX}.aab"
           else
-            NAME="fengchi-mofang-online.apk"
+            cp android/app/build/outputs/apk/debug/app-debug.apk "out/fengchi-mofang${SUFFIX}-debug.apk"
           fi
-          cp android/app/build/outputs/apk/debug/app-debug.apk "out/$NAME"
           ls -lh out
 
       - name: 上传为 Actions 产物（需登录 GitHub 下载）
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ env.APP_MODE }}
-          path: out/*.apk
+          name: android-${{ env.APP_MODE }}-${{ env.BUILD_TYPE }}
+          path: out/*
           retention-days: 90
 
-      - name: 发布到 Releases（得到固定下载链接，手机免登录）
+      - name: 发布到 Releases（固定下载链接，手机免登录）
+        if: env.BUILD_TYPE == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
@@ -117,11 +151,17 @@ jobs:
             自动构建的安卓安装包，手机上直接点开下载即可安装。
 
             - 打包方式：`${{ env.APP_MODE }}`
+            - 构建类型：`${{ env.BUILD_TYPE }}`
+            - 版本：`${{ env.VERSION_NAME }}`（build ${{ env.VERSION_CODE }}）
             - 构建提交：`${{ github.sha }}`
-            - 构建时间：${{ github.event.repository.updated_at }}
+            - 更新时间：${{ github.event.repository.updated_at }}
 
-            > online = 在线壳（页面走线上网址，改网站即刻生效）
-            > bundled = 离线版（页面装在 App 内，断网也能打开）
-          files: out/*.apk
+            > online = 在线壳（页面走线上网址，改网站即刻生效，无需重装）
+            > bundled = 离线版（页面装在 App 内，断网也能打开，需重装更新）
+
+            【签名说明】本次使用 `KEYSTORE_BASE64` Secret 提供的密钥；
+            若未配置则为临时调试密钥（仅供验证，不能上架 / 不能覆盖安装正式包）。
+            正式分发前请见仓库内 `APP_RELEASE.md` 配置签名密钥。
+          files: out/*
           overwrite_files: true
           make_latest: false
