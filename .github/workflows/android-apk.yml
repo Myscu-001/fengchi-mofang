@@ -117,9 +117,9 @@ jobs:
         run: |
           chmod +x gradlew
           if [ "$BUILD_TYPE" = "release" ]; then
-            ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+            ./gradlew assembleRelease bundleRelease -PVERSION_CODE="$VERSION_CODE" -PVERSION_NAME="$VERSION_NAME" --no-daemon --stacktrace
           else
-            ./gradlew assembleDebug --no-daemon --stacktrace
+            ./gradlew assembleDebug -PVERSION_CODE="$VERSION_CODE" -PVERSION_NAME="$VERSION_NAME" --no-daemon --stacktrace
           fi
 
       - name: 整理产物
