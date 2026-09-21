@@ -5,6 +5,9 @@ import { useSiteStore } from '@/stores/site'
 /** 图案存放在 site_settings：读=所有登录用户，写=仅超级管理员（settings.manage） */
 export const CFOP_PATTERNS_KEY = 'cfop.patterns'
 
+/** 公式同样存在 site_settings：读=所有登录用户，写=仅超级管理员。结构与图案一致，全机构共用。 */
+export const CFOP_FORMULAS_KEY = 'cfop.formulas'
+
 /** 判断是否为「表尚未创建」类错误，用于给出友好指引 */
 export function isMissingTableError(err) {
   return /does not exist|PGRST205|schema cache|relation/i.test(err?.message || '')
@@ -41,6 +44,45 @@ export async function saveCfopPatterns(patterns) {
   } catch {
     // 缓存同步失败不影响已经写入的结果
   }
+}
+
+/* ---------------- 公式（全局共享，与图案同源同权限） ---------------- */
+
+/**
+ * 读取全局公式。
+ * 结构：{ "oll:12": { solve: "R U R' U'", setup: "U R U' R'" }, ... }
+ * 与图案一样直接复用 site store 的缓存，避免多一次到新加坡的往返。
+ */
+export async function loadCfopFormulas() {
+  try {
+    const site = useSiteStore()
+    const settings = await site.load()
+    const v = settings?.[CFOP_FORMULAS_KEY]
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 保存全局公式。
+ * 只提交有内容的条目：solve / setup 都为空的会被剔除，避免库里堆一堆空对象。
+ * 写库后同步 site store 缓存，否则保存完页面仍显示旧公式。
+ */
+export async function saveCfopFormulas(formulas) {
+  const next = {}
+  for (const [key, v] of Object.entries(formulas || {})) {
+    const solve = String(v?.solve ?? '').trim()
+    const setup = String(v?.setup ?? '').trim()
+    if (solve || setup) next[key] = { solve, setup }
+  }
+  await saveSetting(CFOP_FORMULAS_KEY, next)
+  try {
+    useSiteStore().patch(CFOP_FORMULAS_KEY, next)
+  } catch {
+    // 缓存同步失败不影响已经写入的结果
+  }
+  return next
 }
 
 /* ---------------- 学习进度（按学员） ---------------- */

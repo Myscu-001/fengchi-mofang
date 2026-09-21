@@ -5,6 +5,10 @@
         <template #icon><ArrowLeft class="size-3.5" /></template>
         返回学习记录
       </UiButton>
+      <UiButton :variant="formulaMode ? 'primary' : 'outline'" @click="toggleFormulaMode">
+        <template #icon><Sigma class="size-3.5" /></template>
+        切换公式
+      </UiButton>
       <UiButton v-if="canEditPatterns" variant="outline" @click="toggleEditor">
         <template #icon><Palette class="size-3.5" /></template>
         {{ editorOpen ? '收起图案编辑' : '图案编辑' }}
@@ -12,6 +16,16 @@
     </PageHeader>
 
     <div class="fc-container space-y-5 py-7">
+      <!-- 公式模式说明条：只是加一条提示，进度 / 筛选 / 图案 / 日期等其它信息原样不动 -->
+      <div v-if="formulaMode" class="fc-formula-bar">
+        <Sigma class="size-4 shrink-0" />
+        <span>
+          公式模式：点任意情况可查看<b>复原公式</b>与<b>构造公式</b>；此模式下勾选已暂停。
+          <template v-if="formulaCount">已录入 {{ formulaCount }} / {{ CFOP_TOTAL }} 个</template>
+        </span>
+        <button type="button" class="fc-formula-bar-x" @click="toggleFormulaMode">退出</button>
+      </div>
+
       <!-- ============ 图案编辑（仅超级管理员） ============ -->
       <section v-if="editorOpen && canEditPatterns" class="fc-card p-5">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200 pb-3.5">
@@ -175,16 +189,17 @@
               v-for="c in visibleCases(g.key)"
               :key="c.key"
               class="cfop-case"
-              :class="{ done: hasLearned(c.key) }"
+              :class="{ done: hasLearned(c.key), 'formula-on': formulaMode }"
               role="button"
               tabindex="0"
-              :title="c.title"
-              @click="toggleCase(c)"
-              @keydown.enter.prevent="toggleCase(c)"
+              :title="formulaMode ? `${c.title} · 查看公式` : c.title"
+              @click="onCaseClick(c)"
+              @keydown.enter.prevent="onCaseClick(c)"
             >
               <div v-html="figureFor(c)" />
               <span class="cl">{{ c.label }}</span>
-              <span class="date-row">
+              <!-- 公式模式下日期不可点：整张卡片让给「查看公式」 -->
+              <span class="date-row" :class="{ 'pointer-events-none': formulaMode }">
                 <template v-if="hasLearned(c.key)">
                   <span class="date-text" :class="{ ph: !learned[c.key] }">
                     {{ learned[c.key] || '补填日期' }}
@@ -202,6 +217,8 @@
               </span>
               <span class="tick">✓</span>
               <span v-if="patterns[c.key]" class="cfg" />
+              <!-- 已录公式的标记：公式模式下才显示，方便一眼看出哪些还没录 -->
+              <span v-if="formulaMode && formulas[c.key]" class="fml" />
             </div>
           </div>
 
@@ -211,15 +228,31 @@
         </section>
       </template>
     </div>
+
+    <!-- 公式详情子页面：手机从底部升起，桌面居中弹窗 -->
+    <CfopFormulaSheet
+      :open="!!formulaCase"
+      :item="formulaCase"
+      :figure="formulaCase ? figureFor(formulaCase) : ''"
+      :formula="formulaCase ? formulas[formulaCase.key] || {} : {}"
+      :learned="formulaCase ? hasLearned(formulaCase.key) : false"
+      :learned-date="formulaCase ? learned[formulaCase.key] || '' : ''"
+      :can-edit="canEditPatterns"
+      :saving="savingFormula"
+      :saved-tick="formulaSavedTick"
+      @close="formulaCase = null"
+      @save="saveFormula"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Palette, TriangleAlert } from 'lucide-vue-next'
+import { ArrowLeft, Palette, Sigma, TriangleAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
+import CfopFormulaSheet from '@/components/CfopFormulaSheet.vue'
 import { getStudent } from '@/api/students'
 import {
   CFOP_GROUPS,
@@ -238,6 +271,8 @@ import {
 import {
   loadCfopPatterns,
   saveCfopPatterns,
+  loadCfopFormulas,
+  saveCfopFormulas,
   loadCfopProgress,
   setCfopLearned,
   isMissingTableError,
@@ -264,6 +299,8 @@ const student = ref(null)
 /** { "oll:12": "2026-09-15", ... } */
 const learned = ref({})
 const patterns = ref({})
+/** { "oll:12": { solve: "R U R' U'", setup: "U R U' R'" }, ... }（全机构共用） */
+const formulas = ref({})
 const tableMissing = ref(false)
 const loading = ref(true)
 const filter = ref('all')
@@ -371,13 +408,16 @@ async function loadProgress() {
 }
 
 async function loadAll() {
-  // 三个请求并发：Supabase 在新加坡，串行会多出一趟往返（约 200~400ms）
+  // 四个请求并发：Supabase 在新加坡，串行会多出一趟往返（约 200~400ms）
   await Promise.all([
     loadStudent(),
     loadProgress(),
     loadCfopPatterns().then((p) => {
       patterns.value = p
       draft.value = JSON.parse(JSON.stringify(p))
+    }),
+    loadCfopFormulas().then((f) => {
+      formulas.value = f
     }),
   ])
 }
@@ -468,6 +508,9 @@ function toggleEditor() {
   if (editorOpen.value) {
     draft.value = JSON.parse(JSON.stringify(patterns.value))
     dirty.value = false
+    // 与公式模式互斥：两块面板同时开着，卡片点击的语义就连自己都说不清了
+    formulaMode.value = false
+    formulaCase.value = null
   }
 }
 
@@ -590,6 +633,67 @@ function resetDraft() {
   draft.value = JSON.parse(JSON.stringify(patterns.value))
   dirty.value = false
   toast.success('已放弃未保存的改动')
+}
+
+/* ---------- 公式模式（查看 / 录入每个情况的复原公式与构造公式） ---------- */
+const formulaMode = ref(false)
+/** 当前打开公式弹层的情况；null 表示弹层关闭 */
+const formulaCase = ref(null)
+const savingFormula = ref(false)
+/** 每次保存成功 +1，通知弹层把「已保存」基准刷新，这样才能连续改同一条并再次保存 */
+const formulaSavedTick = ref(0)
+
+const formulaCount = computed(() => Object.keys(formulas.value).length)
+
+/**
+ * 开关公式模式。
+ * 打开时收起图案编辑：两块面板同时开着，卡片上就分不清点击是弹公式还是涂色了。
+ */
+function toggleFormulaMode() {
+  formulaMode.value = !formulaMode.value
+  formulaCase.value = null
+  if (formulaMode.value && editorOpen.value) editorOpen.value = false
+}
+
+/** 卡片点击分流：公式模式下弹公式详情，否则维持原来的「勾选 / 取消掌握」 */
+function onCaseClick(c) {
+  if (formulaMode.value) {
+    formulaCase.value = c
+    return
+  }
+  toggleCase(c)
+}
+
+/**
+ * 保存某个情况的公式。
+ * 与图案同一套读写方式：把这一条并回整份，再整份提交（只有超管能写，冲突面很小）。
+ * api 层会把 solve/setup 都为空的情况剔除，所以清空输入 = 删除该条。
+ */
+async function saveFormula({ key, solve, setup }) {
+  if (!key) return
+  savingFormula.value = true
+  const prev = formulas.value
+
+  const next = { ...prev }
+  if (solve || setup) next[key] = { solve, setup }
+  else delete next[key]
+
+  try {
+    formulas.value = await saveCfopFormulas(next)
+    formulaSavedTick.value += 1
+    recordAudit({
+      action: 'settings',
+      targetType: 'settings',
+      targetId: 'cfop.formulas',
+      summary: `保存 CFOP 公式（${cfopCaseByKey(key)?.title || key}）`,
+    })
+    toast.success(solve || setup ? '公式已保存' : '已清空该情况的公式')
+  } catch (err) {
+    formulas.value = prev
+    toast.error(err.message)
+  } finally {
+    savingFormula.value = false
+  }
 }
 
 /* ---------- 其它 ---------- */
@@ -826,5 +930,56 @@ onMounted(() => {
 .cfop-scope .cfop-case.done .tick {
   opacity: 1;
   transform: scale(1);
+}
+
+/* ---------- 公式模式 ---------- */
+.cfop-scope .fc-formula-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid #ffd9d7;
+  border-radius: 12px;
+  background: #fff5f5;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #b3403a;
+}
+.cfop-scope .fc-formula-bar b {
+  font-weight: 600;
+  color: #ae2c27;
+}
+.cfop-scope .fc-formula-bar-x {
+  flex: none;
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid #f3bdb9;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ae2c27;
+}
+.cfop-scope .fc-formula-bar-x:active {
+  background: #ffeceb;
+}
+
+/* 公式模式下整卡变成「查看公式」：边框转成品牌色，手感上区别于勾选 */
+.cfop-scope .cfop-case.formula-on {
+  border-color: #ffd9d7;
+}
+.cfop-scope .cfop-case.formula-on.done {
+  border-color: #34d399;
+}
+
+/* 「已录公式」标记：只在公式模式显示，一眼看出哪些情况还没录 */
+.cfop-scope .cfop-case .fml {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34b4e2;
 }
 </style>
