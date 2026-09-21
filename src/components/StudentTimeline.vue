@@ -1,6 +1,6 @@
 <template>
-  <section class="fc-card tl-card">
-    <header class="tl-head">
+  <section class="tl-card" :class="bare ? 'tl-bare' : 'fc-card'">
+    <header v-if="!bare" class="tl-head">
       <h3 class="tl-title">
         <Clock class="size-4" />
         成长时间线
@@ -148,6 +148,11 @@ const props = defineProps({
   /** { "3x3": { type, target, baseline, due, note } } */
   goals: { type: Object, default: () => ({}) },
   loading: Boolean,
+  /**
+   * 嵌在弹层（UiSheet）里时：隐藏自身标题头、去掉卡片外壳，
+   * 并放开 overflow —— 否则侧栏的 position:sticky 会被 overflow:hidden 截断而失效。
+   */
+  bare: Boolean,
 })
 
 /** 事件类型 → 图标（与模拟稿一致：奖杯 / 奖牌 / 靶心 / 书 / 清单 / 旗） */
@@ -222,6 +227,19 @@ function jumpTo(key) {
 <style scoped>
 .tl-card {
   overflow: hidden;
+}
+/* 弹层内：放开 overflow，让侧栏 sticky 相对弹层滚动容器生效 */
+.tl-card.tl-bare {
+  overflow: visible;
+}
+
+/* 弹层内：筛选条吸顶 —— 长列表滚到下面也能随时切筛选 */
+.tl-card.tl-bare .tl-chips {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid var(--color-ink-100, #f1f2f0);
 }
 
 /* ---------- 头部 ---------- */

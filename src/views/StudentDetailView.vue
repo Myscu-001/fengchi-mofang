@@ -13,6 +13,10 @@
         <template #icon><FileText class="size-3.5" /></template>
         成长报告
       </UiButton>
+      <UiButton variant="outline" @click="openTimeline">
+        <template #icon><History class="size-3.5" /></template>
+        成长时间线
+      </UiButton>
       <UiButton v-if="canManageStudent" variant="outline" @click="openStudentEdit">
         <template #icon><UserCog class="size-4" /></template>
         编辑资料
@@ -91,16 +95,6 @@
           <p v-if="student.notes" class="mt-2 text-[12.5px] leading-relaxed text-ink-500">{{ student.notes }}</p>
         </div>
       </div>
-
-      <!-- 成长时间线：把成绩 / 上课记录 / CFOP 进度 / 训练目标串成一条按时间倒序的事件流 -->
-      <StudentTimeline
-        :student="student"
-        :scores="timelineScores"
-        :logs="learningLogs"
-        :cfop-learned="cfopLearned"
-        :goals="studentGoals"
-        :loading="timelineLoading"
-      />
 
       <!-- 魔方段位 -->
       <div class="fc-card p-5">
@@ -699,6 +693,25 @@
         <UiButton variant="primary" :loading="goalSaving" @click="saveGoal">保存目标</UiButton>
       </template>
     </UiModal>
+
+    <!-- 成长时间线：把成绩 / 上课记录 / CFOP 进度 / 训练目标串成一条按时间倒序的事件流。
+         顶栏「成长时间线」按钮打开；手机端底部升起、桌面端居中，内容在弹层内部滚动。 -->
+    <UiSheet
+      :open="timelineOpen"
+      title="成长时间线"
+      :subtitle="student ? student.name + ' · 成绩 / 上课 / CFOP / 目标 的完整轨迹' : ''"
+      @close="timelineOpen = false"
+    >
+      <StudentTimeline
+        bare
+        :student="student"
+        :scores="timelineScores"
+        :logs="learningLogs"
+        :cfop-learned="cfopLearned"
+        :goals="studentGoals"
+        :loading="timelineLoading"
+      />
+    </UiSheet>
   </div>
 </template>
 
@@ -714,6 +727,7 @@ import {
   ExternalLink,
   FileText,
   FolderOpen,
+  History,
   ListChecks,
   Medal,
   Pencil,
@@ -736,6 +750,7 @@ import UiStat from '@/components/UiStat.vue'
 import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiPagination from '@/components/UiPagination.vue'
+import UiSheet from '@/components/UiSheet.vue'
 import ResourceIcon from '@/components/ResourceIcon.vue'
 import StudentTimeline from '@/components/StudentTimeline.vue'
 import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
@@ -808,6 +823,9 @@ const goalForm = reactive({ type: 'time', target: '', baseline: '', due: '', not
 const timelineScores = ref([])
 const cfopLearned = ref({})
 const timelineLoading = ref(false)
+/** 时间线改成弹层展示：数据按需加载（不点开就不拉那两次跨洋请求） */
+const timelineOpen = ref(false)
+const timelineLoaded = ref(false)
 /** 该学员的训练目标：{ "3x3": { type, target, baseline, due, note } } */
 const studentGoals = computed(() => (student.value ? goals.value[student.value.id] || {} : {}))
 
@@ -1443,7 +1461,8 @@ async function load() {
   try {
     student.value = await getStudent(route.params.id)
     if (student.value) {
-      await Promise.all([loadProject(), loadBests(), loadGoalsList(), loadLearning(), loadTimeline()])
+      // 时间线数据改为「点开弹层时再加载」，首屏少两次跨洋请求
+      await Promise.all([loadProject(), loadBests(), loadGoalsList(), loadLearning()])
     }
   } catch (err) {
     toast.error(err.message)
@@ -1454,7 +1473,7 @@ async function load() {
 
 /** 时间线数据：跨项目全量成绩 + CFOP 掌握情况。任一项失败都不影响页面其它部分 */
 async function loadTimeline() {
-  if (!student.value) return
+  if (!student.value) return false
   timelineLoading.value = true
   try {
     const [rows, cfop] = await Promise.all([
@@ -1463,12 +1482,20 @@ async function loadTimeline() {
     ])
     timelineScores.value = Array.isArray(rows) ? rows : []
     cfopLearned.value = cfop && typeof cfop === 'object' ? cfop : {}
+    return true
   } catch {
     timelineScores.value = []
     cfopLearned.value = {}
+    return false
   } finally {
     timelineLoading.value = false
   }
+}
+
+/** 打开成长时间线弹层：首次打开才加载，失败下次还能重试 */
+async function openTimeline() {
+  timelineOpen.value = true
+  if (!timelineLoaded.value) timelineLoaded.value = await loadTimeline()
 }
 
 async function loadBests() {
