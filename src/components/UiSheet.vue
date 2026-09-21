@@ -1,23 +1,27 @@
 <template>
   <Teleport to="body">
-    <Transition name="fc-sheet">
-      <div v-if="open" class="fc-sheet-root" @click.self="closeOnOverlay && $emit('close')">
-        <div class="fc-sheet-mask" />
+    <Transition name="ui-sheet">
+      <div v-if="open" class="ui-sheet-root">
+        <!-- 遮罩：点击关闭（层级显式压在面板之下，见下方样式） -->
+        <div
+          class="ui-sheet-mask"
+          @click="closeOnOverlay && $emit('close')"
+        />
 
-        <div class="fc-sheet-panel" role="dialog" aria-modal="true">
-          <header class="fc-sheet-head">
+        <div class="ui-sheet-panel" role="dialog" aria-modal="true">
+          <header class="ui-sheet-head">
             <div class="min-w-0">
               <slot name="header">
-                <h3 class="fc-sheet-title">{{ title }}</h3>
-                <p v-if="subtitle" class="fc-sheet-sub">{{ subtitle }}</p>
+                <h3 class="ui-sheet-title">{{ title }}</h3>
+                <p v-if="subtitle" class="ui-sheet-sub">{{ subtitle }}</p>
               </slot>
             </div>
-            <button type="button" class="fc-sheet-x" aria-label="关闭" @click="$emit('close')">
+            <button type="button" class="ui-sheet-x" aria-label="关闭" @click="$emit('close')">
               <X class="size-4.5" />
             </button>
           </header>
 
-          <div class="fc-sheet-body">
+          <div class="ui-sheet-body">
             <slot />
           </div>
         </div>
@@ -69,8 +73,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ⚠️ 类名必须用 ui-sheet-* 前缀，且与本组件外的任何全局样式隔离：
+   之前叫 fc-sheet-*，与 styles/app-workbench.css 里「系统管理抽屉」的
+   .fc-sheet-mask 撞名 —— 全局那条写了 z-index: 60，而本组件（scoped）没写，
+   结果遮罩被顶到面板之上：整屏被 34% 深色 + blur 盖住（看着发虚发糊），
+   且遮罩吃掉全部点击 → 关不掉、点不动。
+   现改为独占前缀 + 显式层级（mask 0 / panel 1），从根上杜绝再次发生。 */
+
 /* 手机端：底部升起的抽屉；桌面端：居中弹窗（见下方媒体查询） */
-.fc-sheet-root {
+.ui-sheet-root {
   position: fixed;
   inset: 0;
   z-index: 120;
@@ -79,15 +90,18 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.fc-sheet-mask {
+.ui-sheet-mask {
   position: absolute;
   inset: 0;
-  background: rgba(20, 23, 15, 0.45);
-  backdrop-filter: blur(2px);
+  z-index: 0;
+  /* 不用 backdrop-filter：全视口模糊会让 Chromium 把整屏按低分辨率光栅化，
+     文字会整体发虚，而且低端机/软件渲染下容易卡顿。纯色遮罩更稳、更接近原生。 */
+  background: rgb(20 23 15 / 0.42);
 }
 
-.fc-sheet-panel {
+.ui-sheet-panel {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -95,11 +109,11 @@ onBeforeUnmount(() => {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: #fff;
   border-radius: 20px 20px 0 0;
-  box-shadow: 0 -8px 40px -8px rgba(20, 23, 15, 0.28);
+  box-shadow: 0 -8px 40px -8px rgb(20 23 15 / 0.28);
 }
 
 /* ---------- 头部：固定不滚 ---------- */
-.fc-sheet-head {
+.ui-sheet-head {
   display: flex;
   flex: none;
   align-items: flex-start;
@@ -108,18 +122,18 @@ onBeforeUnmount(() => {
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--color-ink-200, #e3e5e2);
 }
-.fc-sheet-title {
+.ui-sheet-title {
   margin: 0;
   font-size: 15.5px;
   font-weight: 700;
   color: var(--color-ink-900, #14170f);
 }
-.fc-sheet-sub {
+.ui-sheet-sub {
   margin: 3px 0 0;
   font-size: 12px;
   color: var(--color-ink-400, #8b918a);
 }
-.fc-sheet-x {
+.ui-sheet-x {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -131,13 +145,17 @@ onBeforeUnmount(() => {
   color: var(--color-ink-400, #8b918a);
   transition: background 0.15s, color 0.15s;
 }
-.fc-sheet-x:active {
+.ui-sheet-x:hover {
+  background: var(--color-ink-100, #f1f2f0);
+  color: var(--color-ink-700, #3d4239);
+}
+.ui-sheet-x:active {
   background: var(--color-ink-100, #f1f2f0);
   color: var(--color-ink-700, #3d4239);
 }
 
 /* ---------- 内容：内部滚动，不带动背景页面 ---------- */
-.fc-sheet-body {
+.ui-sheet-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -146,55 +164,55 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 1024px) {
-  .fc-sheet-root {
+  .ui-sheet-root {
     align-items: center;
     padding: 24px;
   }
-  .fc-sheet-panel {
+  .ui-sheet-panel {
     width: 100%;
     max-width: 1060px;
     max-height: 86vh;
     padding-bottom: 0;
     border-radius: 18px;
-    box-shadow: 0 20px 60px -12px rgba(20, 23, 15, 0.32);
+    box-shadow: 0 20px 60px -12px rgb(20 23 15 / 0.32);
   }
-  .fc-sheet-head {
+  .ui-sheet-head {
     padding: 16px 22px 13px;
   }
-  .fc-sheet-body {
+  .ui-sheet-body {
     padding-bottom: 4px;
   }
 }
 
 /* ---------- 过渡：手机自下升起 / 桌面淡入上浮 ---------- */
-.fc-sheet-enter-active,
-.fc-sheet-leave-active {
+.ui-sheet-enter-active,
+.ui-sheet-leave-active {
   transition: opacity 0.2s ease;
 }
-.fc-sheet-enter-active .fc-sheet-panel,
-.fc-sheet-leave-active .fc-sheet-panel {
+.ui-sheet-enter-active .ui-sheet-panel,
+.ui-sheet-leave-active .ui-sheet-panel {
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.fc-sheet-enter-from,
-.fc-sheet-leave-to {
+.ui-sheet-enter-from,
+.ui-sheet-leave-to {
   opacity: 0;
 }
-.fc-sheet-enter-from .fc-sheet-panel,
-.fc-sheet-leave-to .fc-sheet-panel {
+.ui-sheet-enter-from .ui-sheet-panel,
+.ui-sheet-leave-to .ui-sheet-panel {
   transform: translateY(100%);
 }
 @media (min-width: 1024px) {
-  .fc-sheet-enter-from .fc-sheet-panel,
-  .fc-sheet-leave-to .fc-sheet-panel {
+  .ui-sheet-enter-from .ui-sheet-panel,
+  .ui-sheet-leave-to .ui-sheet-panel {
     transform: translateY(12px) scale(0.985);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fc-sheet-enter-active,
-  .fc-sheet-leave-active,
-  .fc-sheet-enter-active .fc-sheet-panel,
-  .fc-sheet-leave-active .fc-sheet-panel {
+  .ui-sheet-enter-active,
+  .ui-sheet-leave-active,
+  .ui-sheet-enter-active .ui-sheet-panel,
+  .ui-sheet-leave-active .ui-sheet-panel {
     transition: none;
   }
 }

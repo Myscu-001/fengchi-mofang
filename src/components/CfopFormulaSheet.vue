@@ -257,11 +257,14 @@ onBeforeUnmount(() => {
 .fc-fsheet-mask {
   position: absolute;
   inset: 0;
-  background: rgb(20 23 15 / 0.4);
-  backdrop-filter: blur(2px);
+  /* 显式层级：必须低于面板，否则遮罩会盖住面板并吃掉所有点击。
+     同样不用 backdrop-filter —— 全视口模糊会让整屏按低分辨率光栅化，文字发虚。 */
+  z-index: 0;
+  background: rgb(20 23 15 / 0.42);
 }
 .fc-fsheet-panel {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
