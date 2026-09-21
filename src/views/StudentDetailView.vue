@@ -92,6 +92,16 @@
         </div>
       </div>
 
+      <!-- 成长时间线：把成绩 / 上课记录 / CFOP 进度 / 训练目标串成一条按时间倒序的事件流 -->
+      <StudentTimeline
+        :student="student"
+        :scores="timelineScores"
+        :logs="learningLogs"
+        :cfop-learned="cfopLearned"
+        :goals="studentGoals"
+        :loading="timelineLoading"
+      />
+
       <!-- 魔方段位 -->
       <div class="fc-card p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -727,6 +737,7 @@ import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiPagination from '@/components/UiPagination.vue'
 import ResourceIcon from '@/components/ResourceIcon.vue'
+import StudentTimeline from '@/components/StudentTimeline.vue'
 import { CUBE_PROJECTS, STUDENT_STATUS, STUDENT_STATUS_OPTIONS } from '@/lib/dict'
 import { rankForProject, nextRank, rankTiers } from '@/lib/ranks'
 import { formatDate } from '@/lib/format'
@@ -751,6 +762,7 @@ import {
   computeAo5,
 } from '@/api/scores'
 import { listScoresForAnalysis } from '@/api/analytics'
+import { loadCfopProgress } from '@/api/cfop'
 import { listResourcesByTag, isLinkResource, previewUrl } from '@/api/resources'
 import { loadGoals, saveGoals } from '@/api/goals'
 import { listLearningLogs, isMissingTableError } from '@/api/learning'
@@ -789,6 +801,15 @@ const goals = ref({})
 const goalOpen = ref(false)
 const goalSaving = ref(false)
 const goalForm = reactive({ type: 'time', target: '', baseline: '', due: '', note: '' })
+
+/* ---------- 成长时间线 ----------
+   成绩 / 上课 / CFOP 三类数据已分别由 loadProject / loadLearning / 目标加载取得，
+   这里额外补两样：**跨项目**的全量成绩（时间线不受项目切换影响）、以及 CFOP 掌握情况。 */
+const timelineScores = ref([])
+const cfopLearned = ref({})
+const timelineLoading = ref(false)
+/** 该学员的训练目标：{ "3x3": { type, target, baseline, due, note } } */
+const studentGoals = computed(() => (student.value ? goals.value[student.value.id] || {} : {}))
 
 // 学习记录
 const learningLogs = ref([])
@@ -1421,11 +1442,32 @@ async function load() {
   loading.value = true
   try {
     student.value = await getStudent(route.params.id)
-    if (student.value) await Promise.all([loadProject(), loadBests(), loadGoalsList(), loadLearning()])
+    if (student.value) {
+      await Promise.all([loadProject(), loadBests(), loadGoalsList(), loadLearning(), loadTimeline()])
+    }
   } catch (err) {
     toast.error(err.message)
   } finally {
     loading.value = false
+  }
+}
+
+/** 时间线数据：跨项目全量成绩 + CFOP 掌握情况。任一项失败都不影响页面其它部分 */
+async function loadTimeline() {
+  if (!student.value) return
+  timelineLoading.value = true
+  try {
+    const [rows, cfop] = await Promise.all([
+      auth.can('score.view') ? listAllStudentScores(student.value.id) : Promise.resolve([]),
+      loadCfopProgress(student.value.id).catch(() => ({})),
+    ])
+    timelineScores.value = Array.isArray(rows) ? rows : []
+    cfopLearned.value = cfop && typeof cfop === 'object' ? cfop : {}
+  } catch {
+    timelineScores.value = []
+    cfopLearned.value = {}
+  } finally {
+    timelineLoading.value = false
   }
 }
 
@@ -1701,7 +1743,10 @@ async function exportReport() {
   const inst = {}
   if (auth.can('score.view')) {
     try {
-      const [mine, everyone] = await Promise.all([listAllStudentScores(st.id), listScoresForAnalysis({})])
+      const [mine, everyone] = await Promise.all([
+        timelineScores.value.length ? Promise.resolve(timelineScores.value) : listAllStudentScores(st.id),
+        listScoresForAnalysis({}),
+      ])
       allScores = mine
       for (const s of everyone) {
         if (!inst[s.project]) inst[s.project] = { avg: new Map(), single: new Map() }
