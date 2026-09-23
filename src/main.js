@@ -34,6 +34,30 @@ initNativeShell(router)
 // iOS 风格左边缘右滑返回（仅触屏启用，桌面忽略）
 initEdgeSwipeBack()
 
+/* 版本自愈：不管 Service Worker 有没有更新、Webview 缓存多顽固，只要线上有了新版就拉回来。
+   做法：每次启动用 no-store 拉一次 version.json，跟本机记录的 build 号比 —— 不一样说明
+   站在我这个 App 里的还是旧包，于是清缓存并重新加载。整个动作每次会话最多一次。 */
+async function checkNewVersion() {
+  try {
+    const KEY = 'fc-app-build'
+    const res = await fetch(`${import.meta.env.BASE_URL}version.json?_=${Date.now()}`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return
+    const { build } = await res.json()
+    const known = localStorage.getItem(KEY)
+    localStorage.setItem(KEY, String(build))
+    if (known && known !== String(build)) {
+      const sw = navigator.serviceWorker?.controller
+      if (sw) sw.postMessage('clear-cache')
+      else window.location.reload()
+    }
+  } catch {
+    // 拉不到就当作没更新，正常使用
+  }
+}
+checkNewVersion()
+
 // 注册 Service Worker：网络不稳时回退到缓存的页面外壳，避免断网白屏。
 // 只在生产构建里注册 —— 开发时要避免 SW 把热更新缓存住。
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
