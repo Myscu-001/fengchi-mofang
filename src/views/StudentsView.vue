@@ -175,8 +175,14 @@
         </UiEmpty>
       </div>
 
-      <div v-if="total > pageSize" class="mt-5">
-        <UiPagination v-model:page="page" :page-size="pageSize" :total="total" />
+      <!-- 底部：左侧「切换显示」按钮 + 右侧翻页。开启切换显示后不分页，所有学员铺在同一页里 -->
+      <div v-if="total > pageSize || showAll" class="mt-5 flex flex-wrap items-center justify-center gap-3">
+        <UiButton :variant="showAll ? 'primary' : 'outline'" @click="toggleShowAll">
+          <template #icon><Layers class="size-4" /></template>
+          切换显示
+        </UiButton>
+        <UiPagination v-if="!showAll" v-model:page="page" :page-size="pageSize" :total="total" />
+        <span v-else class="text-sm text-ink-500">已显示全部 {{ total }} 名学员</span>
       </div>
     </div>
 
@@ -276,6 +282,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  Layers,
   PauseCircle,
   Pencil,
   RotateCcw,
@@ -324,6 +331,7 @@ const students = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 15
+const showAll = ref(false)
 const loading = ref(true)
 const filters = reactive({ keyword: '', status: '', level: '' })
 const counts = reactive({ total: 0, active: 0, paused: 0, ended: 0 })
@@ -382,7 +390,13 @@ function openDetail(s) {
 async function load() {
   loading.value = true
   try {
-    const { items, total: count } = await listStudents({ ...filters, page: page.value, pageSize })
+    /* 开启「切换显示」时不再分页，一次取回全部学员 */
+    const { items, total: count } = await listStudents({
+      ...filters,
+      page: page.value,
+      pageSize,
+      paged: !showAll.value,
+    })
     students.value = items
     total.value = count
   } catch (err) {
@@ -410,6 +424,12 @@ async function loadCounts() {
   } catch {
     // 忽略
   }
+}
+
+function toggleShowAll() {
+  showAll.value = !showAll.value
+  page.value = 1
+  load()
 }
 
 function applyFilters() {
