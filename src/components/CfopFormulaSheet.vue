@@ -62,7 +62,21 @@
                 rows="2"
                 spellcheck="false"
                 placeholder="例如：R U R' U' R' F R F'"
+                @focus="activeField = 'solve'"
               />
+              <!-- 点击输入键盘：点哪个键就把记号（含后随空格）追加到当前聚焦的公式框 -->
+              <div v-if="canEdit" class="fc-fsheet-keys">
+                <div class="fc-fsheet-keys-row">
+                  <button type="button" class="fc-fsheet-key fc-fsheet-key--back" @click="backspace">退格</button>
+                  <button type="button" class="fc-fsheet-key" @click="pressKey('(')">(</button>
+                  <button type="button" class="fc-fsheet-key" @click="pressKey(')')">)</button>
+                </div>
+                <div v-for="(row, ri) in KEY_ROWS" :key="ri" class="fc-fsheet-keys-row">
+                  <button v-for="k in row" :key="k" type="button" class="fc-fsheet-key" @click="pressKey(k)">
+                    {{ k }}
+                  </button>
+                </div>
+              </div>
               <p v-else class="fc-fsheet-formula" :class="{ empty: !draft.solve }">
                 {{ draft.solve || '暂未录入' }}
               </p>
@@ -91,6 +105,7 @@
                 rows="2"
                 spellcheck="false"
                 placeholder="留空可点右侧「按复原公式求逆」自动生成"
+                @focus="activeField = 'setup'"
               />
               <p v-else class="fc-fsheet-formula" :class="{ empty: !draft.setup }">
                 {{ draft.setup || '暂未录入' }}
@@ -150,6 +165,36 @@ const draft = ref({ solve: '', setup: '' })
 const baseline = ref({ solve: '', setup: '' })
 const copied = ref('')
 const inverseHint = ref('')
+
+/* ---------- 点击输入键盘 ---------- */
+/* 键盘追记号到「当前聚焦的公式框」：默认复原公式，点过构造公式输入框后就追到构造公式 */
+const activeField = ref('solve')
+const KEY_ROWS = [
+  ['R', "R'", 'R2', 'L', "L'", 'L2'],
+  ['U', "U'", 'U2', 'D', "D'", 'D2'],
+  ['F', "F'", 'F2', 'B', "B'", 'B2'],
+  ['x', "x'", 'x2', 'y', "y'", 'y2'],
+  ['z', "z'", 'z2', 'M', "M'", 'M2'],
+  ['E', "E'", 'E2', 'S', "S'", 'S2'],
+  ['r', "r'", 'r2', 'l', "l'", 'l2'],
+  ['u', "u'", 'u2', 'd', "d'", 'd2'],
+  ['f', "f'", 'f2', 'b', "b'", 'b2'],
+]
+
+function pressKey(tok) {
+  const cur = String(draft.value[activeField.value] || '')
+  /* 前面没以空白结尾就先补一个空格，保证记号之间始终有空格分隔 */
+  const sep = cur && !/\s$/.test(cur) ? ' ' : ''
+  draft.value = { ...draft.value, [activeField.value]: `${cur}${sep}${tok} ` }
+}
+
+function backspace() {
+  /* 按记号删：先把结尾空白吃掉，再删掉最后一个记号（比逐字符删顺手） */
+  const cur = String(draft.value[activeField.value] || '').replace(/\s+$/, '')
+  if (!cur) return
+  const idx = cur.lastIndexOf(' ')
+  draft.value = { ...draft.value, [activeField.value]: idx >= 0 ? cur.slice(0, idx) : '' }
+}
 
 const groupColor = computed(
   () => CFOP_GROUPS.find((g) => g.key === props.item?.group)?.color || '#8B918A',
@@ -388,6 +433,48 @@ onBeforeUnmount(() => {
   outline: none;
   border-color: var(--color-brand-500);
   box-shadow: 0 0 0 3px rgb(232 86 79 / 0.14);
+}
+/* ---------- 点击输入键盘（编辑态显示） ---------- */
+.fc-fsheet-keys {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  user-select: none;
+}
+.fc-fsheet-keys-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+/* 首行只有 退格 / ( / ) 三个键，各占两格，和后面的 6 列对齐 */
+.fc-fsheet-keys-row:first-child .fc-fsheet-key {
+  grid-column: span 2;
+}
+.fc-fsheet-key {
+  border: 1px solid var(--color-ink-200);
+  background: var(--color-ink-50);
+  border-radius: 9px;
+  padding: 8px 0;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.2;
+  color: var(--color-ink-900);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-fsheet-key--back {
+  color: var(--color-brand-600);
+  font-family: inherit;
+  font-size: 13px;
+}
+@media (hover: hover) {
+  .fc-fsheet-key:hover {
+    background: var(--color-ink-100);
+    border-color: var(--color-ink-300);
+  }
+}
+.fc-fsheet-key:active {
+  background: var(--color-ink-200);
 }
 .fc-fsheet-note {
   margin: 18px 0 0;
