@@ -19,7 +19,6 @@
         <p class="text-[12.5px] leading-relaxed text-ink-500">
           这里只看得到<b class="font-medium text-ink-700">这台设备</b>最近的前端报错。反馈问题时点「复制全部」直接发给管理员即可。
         </p>
-
         <div v-if="errorLogs.length" class="mt-4 space-y-2.5">
           <div v-for="(e, i) in errorLogs" :key="i" class="pfm-log">
             <div class="flex items-baseline justify-between gap-3">
@@ -44,14 +43,26 @@
 
         <p v-else class="mt-4 text-[13px] text-ink-400">暂无错误记录，一切正常。</p>
       </div>
+
+      <!-- 界面还是旧样子时的自救：清掉 App 里缓存的页面文件再重载，比重装快 -->
+      <div class="fc-card mt-5 p-5">
+        <h3 class="text-[15px] font-semibold text-ink-900">刷新到最新版本</h3>
+        <p class="mt-1 text-[12.5px] leading-relaxed text-ink-500">
+          网页更新后，App 偶尔还会用这台手机里缓存的旧版本。点一下就把缓存清掉并重新加载，不用卸载重装。
+        </p>
+        <UiButton class="mt-3.5" size="sm" variant="outline" :loading="refreshing" @click="hardRefresh">
+          <template #icon><RefreshCw class="size-3.5" /></template>
+          清除缓存并刷新
+        </UiButton>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Copy, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Copy, RefreshCw, Trash2 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
@@ -59,6 +70,17 @@ import { useProfileAccount } from '@/lib/useProfileAccount'
 
 const router = useRouter()
 const { errorLogs, load, copyLogs, clearLogs } = useProfileAccount()
+
+const refreshing = ref(false)
+
+/* 「清除缓存并刷新」：让 SW 把 fc-* 缓存全部删掉再导航一次，
+   这样连 sw.js 本身没变的场景也能拿到最新资源。没有 SW（浏览器里打开）就直接重载。 */
+function hardRefresh() {
+  refreshing.value = true
+  const sw = navigator.serviceWorker?.controller
+  if (sw) sw.postMessage('clear-cache')
+  else setTimeout(() => window.location.reload(), 200)
+}
 
 onMounted(load)
 </script>

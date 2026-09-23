@@ -38,8 +38,28 @@ initEdgeSwipeBack()
 // 只在生产构建里注册 —— 开发时要避免 SW 把热更新缓存住。
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
-      // 注册失败（隐私模式 / 非 HTTPS / 浏览器不支持）不影响正常使用
-    })
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .then((reg) => {
+        /* 网站发新版后（sw.js 内容变了 / 代次变了），浏览器会装一个新 SW。
+           老 SW 还占着页面时，新 SW 处于 waiting —— 这里直接放行并重载，
+           保证打开 App 看到的永远是最新的界面。每次会话只重载一次，避免来回抖。 */
+        reg.addEventListener('updatefound', () => {
+          const worker = reg.installing
+          if (!worker) return
+          worker.addEventListener('statechange', () => {
+            if (worker.state !== 'installed') return
+            if (!navigator.serviceWorker.controller) return
+            if (sessionStorage.getItem('fc-sw-reloaded')) return
+            sessionStorage.setItem('fc-sw-reloaded', '1')
+            worker.postMessage('skip-waiting')
+            // 稍等一拍，让新 SW 接管完成后再刷新，否则还会拿到旧资源
+            setTimeout(() => window.location.reload(), 300)
+          })
+        })
+      })
+      .catch(() => {
+        // 注册失败（隐私模式 / 非 HTTPS / 浏览器不支持）不影响正常使用
+      })
   })
 }
