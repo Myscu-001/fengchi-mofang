@@ -1,14 +1,59 @@
 <template>
   <div>
-    <PageHeader title="个人中心" description="维护个人资料与登录密码">
-      <!-- 手机端首页工作台不再显示顶栏，退出登录统一收在这里 -->
-      <UiButton variant="outline" class="lg:hidden" @click="handleSignOut">
+    <PageHeader :title="isMobile ? '我的' : '个人中心'" description="维护个人资料与登录密码">
+      <!-- 手机端看不到这一栏（右上角的退出已改成列表里的红色入口），只在电脑保留 -->
+      <UiButton variant="outline" class="hidden lg:inline-flex" @click="handleSignOut">
         <template #icon><LogOut class="size-4" /></template>
         退出登录
       </UiButton>
     </PageHeader>
 
-    <div class="fc-container py-7">
+    <!-- ===================== 手机端：列表入口 + 子页面 ===================== -->
+    <div v-if="isMobile" class="fc-container py-5">
+      <button type="button" class="fc-card w-full p-4.5 text-left" @click="go('profile-edit')">
+        <div class="flex items-center gap-3.5">
+          <UiAvatar :src="auth.profile?.avatar_url" :name="auth.displayName" size="lg" />
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-[16px] font-semibold text-ink-900">{{ auth.displayName }}</p>
+            <p class="mt-0.5 truncate text-[12.5px] text-ink-500">
+              {{ [auth.profile?.title, roleLabel(auth.roleCode)].filter(Boolean).join(' · ') }}
+            </p>
+            <p class="mt-0.5 truncate text-[11.5px] text-ink-400">{{ auth.user?.email }}</p>
+          </div>
+          <ChevronRight class="size-4 shrink-0 text-ink-300" />
+        </div>
+      </button>
+
+      <nav class="fc-card mt-4 overflow-hidden">
+        <button v-for="row in rows" :key="row.name" type="button" class="pfm-row" @click="go(row.name)">
+          <span class="pfm-row-ic" :class="row.warn ? 'pfm-row-ic--warn' : ''">
+            <component :is="row.icon" class="size-4.5" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center gap-2">
+              <b class="truncate text-[14px] font-medium text-ink-900">{{ row.title }}</b>
+              <span v-if="row.tag" class="pfm-tag" :class="row.warn ? 'pfm-tag--warn' : ''">{{ row.tag }}</span>
+            </span>
+            <span class="mt-0.5 block truncate text-[11.5px] text-ink-400">{{ row.sub }}</span>
+          </span>
+          <ChevronRight class="size-4 shrink-0 text-ink-300" />
+        </button>
+      </nav>
+
+      <nav class="fc-card mt-4 overflow-hidden">
+        <button type="button" class="pfm-row" @click="handleSignOut">
+          <span class="pfm-row-ic pfm-row-ic--danger">
+            <LogOut class="size-4.5" />
+          </span>
+          <span class="flex-1 text-[14px] font-medium text-red-600">退出登录</span>
+        </button>
+      </nav>
+
+      <p class="pfm-foot">风驰思维魔方 · 内部管理系统</p>
+    </div>
+
+    <!-- ===================== 电脑端：一整页铺开，维持原样 ===================== -->
+    <div v-else class="fc-container py-7">
       <div class="grid gap-5 lg:grid-cols-[1fr_340px]">
         <!-- 基本资料 -->
         <div class="space-y-5">
@@ -18,9 +63,7 @@
             <div class="mt-4 flex items-center gap-4">
               <UiAvatar :src="auth.profile?.avatar_url" :name="auth.displayName" size="lg" />
               <div>
-                <label
-                  class="inline-flex h-8.5 cursor-pointer items-center gap-1.5 rounded-[10px] border border-ink-200 bg-white px-3 text-[13px] font-medium text-ink-700 transition hover:bg-ink-50"
-                >
+                <label class="pfm-upload">
                   <Upload class="size-3.5" />
                   {{ uploadingAvatar ? '上传中…' : '更换头像' }}
                   <input type="file" accept="image/*" class="hidden" :disabled="uploadingAvatar" @change="handleAvatar" />
@@ -188,9 +231,23 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Copy, Eye, EyeOff, LogOut, Trash2, Upload } from 'lucide-vue-next'
+import {
+  Bug,
+  Check,
+  ChevronRight,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ListChecks,
+  LogOut,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  UserRound,
+} from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import UiButton from '@/components/UiButton.vue'
 import UiBadge from '@/components/UiBadge.vue'
@@ -199,29 +256,81 @@ import UiField from '@/components/UiField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useDialogStore } from '@/stores/dialog'
+import { useProfileAccount } from '@/lib/useProfileAccount'
+import { useIsMobile } from '@/lib/useMediaQuery'
 import { roleLabel, roleStyle } from '@/lib/permissions'
 import { formatDate, relativeTime } from '@/lib/format'
-import { listPermissions } from '@/api/users'
-import { listErrors, clearErrors } from '@/lib/monitor'
 
 const auth = useAuthStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
 const router = useRouter()
+const isMobile = useIsMobile()
 
-const uploadingAvatar = ref(false)
-const savingProfile = ref(false)
-const savingPwd = ref(false)
-const savedAt = ref('')
-const showPwd = ref(false)
-const pwdError = ref('')
-const allPermissions = ref([])
-const errorLogs = ref([])
+const {
+  profileForm,
+  pwdForm,
+  uploadingAvatar,
+  savingProfile,
+  savingPwd,
+  savedAt,
+  showPwd,
+  pwdError,
+  errorLogs,
+  permissionList,
+  load,
+  handleAvatar,
+  saveProfile,
+  savePassword,
+  copyLogs,
+  clearLogs,
+} = useProfileAccount()
 
-const profileForm = reactive({ full_name: '', title: '', phone: '', bio: '' })
-const pwdForm = reactive({ password: '', confirm: '' })
+/* 手机端把每一项拆成入口，点进去再改 —— 列表只负责「显示现状 + 跳过去」 */
+const rows = computed(() => [
+  {
+    name: 'profile-edit',
+    icon: UserRound,
+    title: '个人资料',
+    sub: [auth.profile?.title, auth.profile?.phone].filter(Boolean).join(' · ') || '头像、姓名、职务与简介',
+  },
+  {
+    name: 'profile-password',
+    icon: KeyRound,
+    title: '修改密码',
+    tag: auth.profile?.must_change_password ? '初始密码' : '',
+    warn: !!auth.profile?.must_change_password,
+    sub: auth.profile?.must_change_password ? '当前仍是初始密码，建议尽快修改' : '字母 + 数字，长度至少 8 位',
+  },
+  {
+    name: 'profile-account',
+    icon: ShieldCheck,
+    title: '账号与安全',
+    sub:
+      auth.profile?.status === 'active'
+        ? `账号正常 · ${relativeTime(auth.profile?.last_login_at)}登录`
+        : '账号已停用',
+  },
+  {
+    name: 'profile-permissions',
+    icon: ListChecks,
+    title: '我的权限',
+    sub: `共 ${permissionList.value.length} 项 · ${roleLabel(auth.roleCode)}`,
+  },
+  {
+    name: 'profile-logs',
+    icon: Bug,
+    title: '诊断日志',
+    tag: errorLogs.value.length ? `${errorLogs.value.length} 条` : '',
+    warn: !!errorLogs.value.length,
+    sub: errorLogs.value.length ? '有报错待反馈给管理员' : '暂无错误记录，一切正常',
+  },
+])
 
-/** 退出登录（手机端顶栏被工作台让位后，这里是唯一的退出入口） */
+function go(name) {
+  router.push({ name })
+}
+
 async function handleSignOut() {
   const ok = await dialog.confirm({
     title: '退出登录',
@@ -234,116 +343,84 @@ async function handleSignOut() {
   router.push({ name: 'login' })
 }
 
-const MODULE_LABELS = {
-  system: '系统管理',
-  course: '课程管理',
-  student: '学员管理',
-  class: '班级管理',
-  grade: '成绩管理',
-  resource: '资源管理',
-}
-
-const permissionList = computed(() =>
-  allPermissions.value
-    .filter((p) => auth.permissions.includes(p.code))
-    .map((p) => ({ ...p, moduleLabel: MODULE_LABELS[p.module] || p.module })),
-)
-
-onMounted(async () => {
-  profileForm.full_name = auth.profile?.full_name || ''
-  profileForm.title = auth.profile?.title || ''
-  profileForm.phone = auth.profile?.phone || ''
-  profileForm.bio = auth.profile?.bio || ''
-
-  try {
-    allPermissions.value = await listPermissions()
-  } catch {
-    allPermissions.value = []
-  }
-
-  errorLogs.value = listErrors()
-})
-
-function copyLogs() {
-  const text = errorLogs.value
-    .map(
-      (e, i) =>
-        `#${i + 1} ${e.time}\n页面：${e.route}\n信息：${e.message}\n${e.info ? '位置：' + e.info + '\n' : ''}${e.stack || ''}`,
-    )
-    .join('\n\n')
-  navigator.clipboard
-    .writeText(text)
-    .then(() => toast.success('诊断日志已复制'))
-    .catch(() => toast.error('复制失败，请手动选择文本'))
-}
-
-function clearLogs() {
-  clearErrors()
-  errorLogs.value = []
-  toast.success('诊断日志已清空')
-}
-
-async function handleAvatar(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
-  if (!file) return
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error('头像不能超过 2MB')
-    return
-  }
-  uploadingAvatar.value = true
-  try {
-    await auth.uploadAvatar(file)
-    toast.success('头像已更新')
-  } catch (err) {
-    toast.error(err.message)
-  } finally {
-    uploadingAvatar.value = false
-  }
-}
-
-async function saveProfile() {
-  if (!profileForm.full_name.trim()) {
-    toast.error('请填写姓名')
-    return
-  }
-  savingProfile.value = true
-  try {
-    await auth.updateProfile({
-      full_name: profileForm.full_name.trim(),
-      title: profileForm.title?.trim() || null,
-      phone: profileForm.phone?.trim() || null,
-      bio: profileForm.bio?.trim() || null,
-    })
-    toast.success('资料已保存')
-    savedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  } catch (err) {
-    toast.error(err.message)
-  } finally {
-    savingProfile.value = false
-  }
-}
-
-async function savePassword() {
-  pwdError.value = ''
-  if (pwdForm.password.length < 8) {
-    pwdError.value = '密码长度至少 8 位'
-    return
-  }
-  if (pwdForm.password !== pwdForm.confirm) {
-    pwdError.value = '两次输入的密码不一致'
-    return
-  }
-  savingPwd.value = true
-  try {
-    await auth.changePassword(pwdForm.password)
-    pwdForm.password = ''
-    pwdForm.confirm = ''
-    toast.success('密码已更新')
-  } catch (err) {
-    pwdError.value = err.message
-  } finally {
-    savingPwd.value = false
-  }
-}
+onMounted(load)
 </script>
+
+<style scoped>
+/* 手机端「我的」列表行：左边图标块 + 标题副标题 + 右箭头 */
+.pfm-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  text-align: left;
+  background: transparent;
+  transition: background-color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.pfm-row + .pfm-row {
+  border-top: 1px solid var(--color-ink-100);
+}
+.pfm-row:active {
+  background: var(--color-ink-50);
+}
+.pfm-row-ic {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-brand-50);
+  color: var(--color-brand-600);
+}
+.pfm-row-ic--warn {
+  background: #fff5ed;
+  color: #c2671a;
+}
+.pfm-row-ic--danger {
+  background: #fdeaea;
+  color: #cf3b32;
+}
+.pfm-tag {
+  flex: none;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  background: var(--color-ink-100);
+  color: var(--color-ink-500);
+}
+.pfm-tag--warn {
+  background: #fff1e4;
+  color: #b4600f;
+}
+.pfm-upload {
+  display: inline-flex;
+  height: 34px;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-ink-200);
+  background: #fff;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink-700);
+  transition: background-color 0.15s ease;
+}
+@media (hover: hover) {
+  .pfm-upload:hover {
+    background: var(--color-ink-50);
+  }
+}
+.pfm-foot {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--color-ink-300);
+}
+</style>

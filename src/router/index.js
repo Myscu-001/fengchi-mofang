@@ -71,6 +71,37 @@ const routes = [
         component: () => import('@/views/ProfileView.vue'),
         meta: { title: '个人中心', requiresAuth: true },
       },
+      /* 手机端「我的」拆出的二级页：列表入口 → 点进去再改，桌面端仍在一页里铺开 */
+      {
+        path: 'profile/edit',
+        name: 'profile-edit',
+        component: () => import('@/views/profile/ProfileEditView.vue'),
+        meta: { title: '个人资料', requiresAuth: true },
+      },
+      {
+        path: 'profile/password',
+        name: 'profile-password',
+        component: () => import('@/views/profile/ProfilePasswordView.vue'),
+        meta: { title: '修改密码', requiresAuth: true },
+      },
+      {
+        path: 'profile/account',
+        name: 'profile-account',
+        component: () => import('@/views/profile/ProfileAccountView.vue'),
+        meta: { title: '账号与安全', requiresAuth: true },
+      },
+      {
+        path: 'profile/permissions',
+        name: 'profile-permissions',
+        component: () => import('@/views/profile/ProfilePermissionsView.vue'),
+        meta: { title: '我的权限', requiresAuth: true },
+      },
+      {
+        path: 'profile/logs',
+        name: 'profile-logs',
+        component: () => import('@/views/profile/ProfileLogsView.vue'),
+        meta: { title: '诊断日志', requiresAuth: true },
+      },
       {
         path: 'admin/users',
         name: 'admin-users',
