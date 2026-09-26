@@ -29,20 +29,39 @@
           <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" />
           <input
             v-model="filters.keyword"
+            type="search"
+            enterkeyhint="search"
             class="fc-input pl-9.5"
             placeholder="搜索姓名、昵称、家长姓名或电话"
-            @keyup.enter="applyFilters"
+            @input="onKeywordInput"
+            @keyup.enter="onKeywordEnter"
           />
         </div>
-        <select v-model="filters.status" class="fc-input w-auto min-w-[120px]" @change="applyFilters">
+
+        <!-- 桌面端：原生下拉，鼠标操作最顺 -->
+        <select v-model="filters.status" class="fc-input w-auto min-w-[120px] max-lg:hidden" @change="applyFilters">
           <option value="">全部状态</option>
           <option v-for="o in STUDENT_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
-        <select v-model="filters.level" class="fc-input w-auto min-w-[120px]" @change="applyFilters">
+        <select v-model="filters.level" class="fc-input w-auto min-w-[120px] max-lg:hidden" @change="applyFilters">
           <option value="">全部水平</option>
           <option v-for="l in STUDENT_LEVEL_OPTIONS" :key="l" :value="l">{{ l }}</option>
         </select>
-        <UiButton variant="outline" @click="resetFilters">
+
+        <!-- 手机端：一个「筛选」按钮拉起抽屉。
+             原生 select 在 App 的 WebView 里点击后会弹出空白列表，这里彻底不用它。 -->
+        <button
+          type="button"
+          class="ui-f-btn lg:hidden"
+          :class="activeFilterCount ? 'ui-f-btn--on' : ''"
+          @click="filterOpen = true"
+        >
+          <SlidersHorizontal class="size-4" />
+          筛选
+          <span v-if="activeFilterCount" class="ui-f-badge">{{ activeFilterCount }}</span>
+        </button>
+
+        <UiButton variant="outline" class="max-lg:hidden" @click="resetFilters">
           <template #icon><RotateCcw class="size-3.5" /></template>
           重置
         </UiButton>
@@ -186,6 +205,51 @@
       </div>
     </div>
 
+    <!-- 手机端筛选抽屉：点选即生效（抽屉保持打开，方便连着改两项），点「完成」收起 -->
+    <UiSheet
+      :open="filterOpen"
+      title="筛选学员"
+      subtitle="点选后立即生效"
+      @close="filterOpen = false"
+    >
+      <div class="px-4 pt-1 pb-5">
+        <p class="ui-f-title">学员状态</p>
+        <div class="ui-f-chips">
+          <button
+            v-for="o in STATUS_FILTER_OPTIONS"
+            :key="o.value"
+            type="button"
+            class="ui-f-chip"
+            :class="filters.status === o.value ? 'ui-f-chip--on' : ''"
+            @click="setFilter('status', o.value)"
+          >
+            {{ o.label }}
+          </button>
+        </div>
+
+        <p class="ui-f-title mt-5">当前水平</p>
+        <div class="ui-f-chips">
+          <button
+            v-for="o in LEVEL_FILTER_OPTIONS"
+            :key="o.value"
+            type="button"
+            class="ui-f-chip"
+            :class="filters.level === o.value ? 'ui-f-chip--on' : ''"
+            @click="setFilter('level', o.value)"
+          >
+            {{ o.label }}
+          </button>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <UiButton variant="outline" block :disabled="!activeFilterCount" @click="resetFilterDrawer">
+            重置
+          </UiButton>
+          <UiButton variant="primary" block @click="filterOpen = false">完成</UiButton>
+        </div>
+      </div>
+    </UiSheet>
+
     <!-- 新增 / 编辑 -->
     <UiModal
       :open="formOpen"
@@ -202,11 +266,17 @@
         </UiField>
 
         <UiField label="性别">
-          <select v-model="form.gender" class="fc-input">
+          <select v-model="form.gender" class="fc-input max-lg:hidden">
             <option value="unknown">未填写</option>
             <option value="male">男</option>
             <option value="female">女</option>
           </select>
+          <UiSelectSheet
+            v-model="form.gender"
+            class="lg:hidden"
+            title="选择性别"
+            :options="GENDER_OPTIONS"
+          />
         </UiField>
         <UiField label="出生日期" :hint="form.birthday ? `当前 ${ageOf(form.birthday)}` : '用于自动计算年龄'">
           <input v-model="form.birthday" type="date" class="fc-input" />
@@ -244,9 +314,15 @@
         </UiField>
 
         <UiField label="学员状态">
-          <select v-model="form.status" class="fc-input">
+          <select v-model="form.status" class="fc-input max-lg:hidden">
             <option v-for="o in STUDENT_STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
+          <UiSelectSheet
+            v-model="form.status"
+            class="lg:hidden"
+            title="选择学员状态"
+            :options="STUDENT_STATUS_OPTIONS"
+          />
         </UiField>
 
         <div class="sm:col-span-2">
@@ -276,7 +352,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
   ChevronRight,
@@ -287,6 +363,7 @@ import {
   Pencil,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   Trash2,
   Upload,
   UserCheck,
@@ -303,6 +380,8 @@ import UiEmpty from '@/components/UiEmpty.vue'
 import UiLoading from '@/components/UiLoading.vue'
 import UiModal from '@/components/UiModal.vue'
 import UiField from '@/components/UiField.vue'
+import UiSheet from '@/components/UiSheet.vue'
+import UiSelectSheet from '@/components/UiSelectSheet.vue'
 import UiPagination from '@/components/UiPagination.vue'
 import ImportExportModal from '@/components/ImportExportModal.vue'
 import {
@@ -334,7 +413,21 @@ const pageSize = 15
 const showAll = ref(false)
 const loading = ref(true)
 const filters = reactive({ keyword: '', status: '', level: '' })
+const filterOpen = ref(false)
 const counts = reactive({ total: 0, active: 0, paused: 0, ended: 0 })
+
+/* 手机端筛选抽屉 / 抽屉式选择器的选项（第一项是「全部」，value 为空串） */
+const GENDER_OPTIONS = [
+  { value: 'unknown', label: '未填写' },
+  { value: 'male', label: '男' },
+  { value: 'female', label: '女' },
+]
+const STATUS_FILTER_OPTIONS = [{ value: '', label: '全部状态' }, ...STUDENT_STATUS_OPTIONS]
+const LEVEL_FILTER_OPTIONS = [
+  { value: '', label: '全部水平' },
+  ...STUDENT_LEVEL_OPTIONS.map((l) => ({ value: l, label: l })),
+]
+const activeFilterCount = computed(() => (filters.status ? 1 : 0) + (filters.level ? 1 : 0))
 
 const formOpen = ref(false)
 const editing = ref(null)
@@ -387,7 +480,12 @@ function openDetail(s) {
   router.push({ name: 'student-detail', params: { id: s.id } })
 }
 
+/* 连点筛选项 / 快速打字时会有多个请求同时在飞：用序号丢弃过期响应，
+   防止先发的旧结果后到、把新结果覆盖掉。 */
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   try {
     /* 开启「切换显示」时不再分页，一次取回全部学员 */
@@ -397,14 +495,16 @@ async function load() {
       pageSize,
       paged: !showAll.value,
     })
+    if (seq !== loadSeq) return
     students.value = items
     total.value = count
   } catch (err) {
+    if (seq !== loadSeq) return
     toast.error(err.message)
     students.value = []
     total.value = 0
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -433,8 +533,37 @@ function toggleShowAll() {
 }
 
 function applyFilters() {
-  page.value = 1
-  load()
+  /* page 被 watch 监听：只有已经停在第 1 页时才需要手动 load，
+     否则改 page 本身就会触发一次，再手动打一次就白费一个来回（新加坡节点 200~400ms） */
+  if (page.value === 1) load()
+  else page.value = 1
+}
+
+/* 手机端搜索：输入即搜（350ms 防抖）。安卓软键盘上按「搜索」键不一定触发 keyup.enter，
+   光靠回车是搜不出来的 —— 这是之前搜不到人的根因。 */
+let keywordTimer = null
+
+function onKeywordInput() {
+  clearTimeout(keywordTimer)
+  keywordTimer = setTimeout(applyFilters, 350)
+}
+
+function onKeywordEnter() {
+  clearTimeout(keywordTimer)
+  applyFilters()
+}
+
+/* 手机端筛选抽屉：点一项立即生效（抽屉留着，方便连着改状态和水平） */
+function setFilter(key, value) {
+  if (filters[key] === value) return
+  filters[key] = value
+  applyFilters()
+}
+
+function resetFilterDrawer() {
+  filters.status = ''
+  filters.level = ''
+  applyFilters()
 }
 
 function exportStudents() {
@@ -535,4 +664,89 @@ onMounted(() => {
   load()
   loadCounts()
 })
+
+/* 离开页面时把还没落地的防抖定时器清掉，避免对已卸载的页面发请求 */
+onBeforeUnmount(() => clearTimeout(keywordTimer))
 </script>
+
+<style scoped>
+/* 类名独占 ui-f-* 前缀（筛选按钮 / 抽屉分组 / 选项 chip），绝不与全局样式撞名 */
+
+/* 手机端「筛选」按钮：长得像输入框，但它是 button，点了不会唤起软键盘 */
+.ui-f-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid var(--color-ink-200, #e3e5e2);
+  border-radius: var(--radius-field, 10px);
+  background: #fff;
+  font-size: 14px;
+  color: var(--color-ink-700, #3d4239);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.ui-f-btn:active {
+  background: var(--color-ink-50, #f7f8f6);
+}
+.ui-f-btn--on {
+  border-color: var(--color-brand-500, #e8564f);
+  background: var(--color-brand-50, #fdf1f0);
+  color: var(--color-brand-700, #b93a33);
+  font-weight: 600;
+}
+.ui-f-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-brand-600, #d4453c);
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* 抽屉里的分组标题与选项 chip */
+.ui-f-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink-500, #6b7069);
+}
+.ui-f-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ui-f-chip {
+  min-height: 38px;
+  padding: 8px 15px;
+  border: 1px solid var(--color-ink-200, #e3e5e2);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13.5px;
+  color: var(--color-ink-700, #3d4239);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+.ui-f-chip:active {
+  transform: scale(0.97);
+}
+.ui-f-chip--on {
+  border-color: var(--color-brand-500, #e8564f);
+  background: var(--color-brand-50, #fdf1f0);
+  color: var(--color-brand-700, #b93a33);
+  font-weight: 600;
+}
+</style>
