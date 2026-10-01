@@ -92,22 +92,45 @@
       </div>
     </section>
 
-    <!-- ============ 登录后数据看板 ============ -->
+    <!-- ============ 登录后：数据看板 / 功能导航 ============ -->
     <section v-if="auth.isLoggedIn" class="fc-container py-10">
+      <!-- 标题区随视图切换；右上角是「数据看板 / 功能导航」切换按钮（选择记忆在本地） -->
       <div class="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h2 class="text-[19px] font-semibold text-ink-900">教学概览</h2>
-          <p class="mt-1 text-[13px] text-ink-500">实时统计机构内的教学数据</p>
+          <h2 class="text-[19px] font-semibold text-ink-900">
+            {{ viewMode === 'nav' ? '功能导航' : '教学概览' }}
+          </h2>
+          <p class="mt-1 text-[13px] text-ink-500">
+            {{
+              viewMode === 'nav'
+                ? '常用功能按业务分组铺开，点图标直达对应页面'
+                : '实时统计机构内的教学数据'
+            }}
+          </p>
         </div>
-        <button
-          type="button"
-          class="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-600 transition hover:text-brand-700"
-          @click="loadDashboard"
-        >
-          <RefreshCw class="size-3.5" :class="loadingStats ? 'animate-spin' : ''" />
-          刷新
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="viewMode === 'dash'"
+            type="button"
+            class="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-600 transition hover:text-brand-700"
+            @click="loadDashboard"
+          >
+            <RefreshCw class="size-3.5" :class="loadingStats ? 'animate-spin' : ''" />
+            刷新
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-ink-700 transition hover:border-brand-300 hover:text-brand-600"
+            @click="toggleViewMode"
+          >
+            <component :is="viewMode === 'nav' ? LayoutDashboard : LayoutGrid" class="size-3.5" />
+            {{ viewMode === 'nav' ? '切换到数据看板' : '切换到功能导航' }}
+          </button>
+        </div>
       </div>
+
+      <!-- ============ 数据看板（原有教学概览，结构不变） ============ -->
+      <div v-show="viewMode === 'dash'">
 
       <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <UiStat label="课程总数" :value="stats.courseTotal" :hint="`已上架 ${stats.coursePublished} 门`" :icon="Boxes" tone="brand" />
@@ -169,6 +192,68 @@
           <p v-else class="py-6 text-center text-[13px] text-ink-400">暂无资源</p>
         </div>
       </div>
+      </div>
+      <!-- /数据看板 -->
+
+      <!-- ============ 功能导航（图标墙） ============ -->
+      <div v-if="viewMode === 'nav'">
+        <div v-for="grp in visibleNavGroups" :key="grp.title" class="mb-7">
+          <div class="mb-3 flex items-center gap-2.5">
+            <span class="h-[15px] w-[3px] rounded" :style="{ backgroundColor: grp.color }" />
+            <h3 class="text-[15px] font-semibold text-ink-900">{{ grp.title }}</h3>
+            <span class="text-[12px] text-ink-400">{{ grp.hint }}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <button
+              v-for="item in grp.items"
+              :key="item.label"
+              type="button"
+              class="group flex items-center gap-3 rounded-xl border border-ink-200 bg-white p-3.5 text-left transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lift"
+              @click="onNavItem(item)"
+            >
+              <span
+                class="flex size-11 shrink-0 items-center justify-center rounded-[11px]"
+                :style="{ backgroundColor: item.bg, color: item.fg }"
+              >
+                <component :is="item.icon" class="size-5" />
+              </span>
+              <span class="min-w-0 text-[13.5px] font-medium text-ink-800">{{ item.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="rounded-xl border border-dashed border-brand-200 bg-brand-50/60 px-4 py-3 text-[12.5px] text-brand-700">
+          功能导航仅作快捷入口，数据与「数据看板」完全一致。系统管理类入口按你的账号权限自动显隐。
+        </p>
+      </div>
+
+      <!-- 成长时间线：输入学员姓名跳转到其时间线页面 -->
+      <UiSheet :open="showTimelineSearch" title="跳转到学员成长时间线" @close="showTimelineSearch = false">
+        <div class="p-4">
+          <input
+            v-model="tlKeyword"
+            type="search"
+            class="fc-input w-full"
+            placeholder="输入学员姓名 / 昵称"
+            @input="onTlKeyword"
+          />
+          <ul v-if="tlResults.length" class="mt-3 divide-y divide-ink-100">
+            <li v-for="s in tlResults" :key="s.id">
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 py-2.5 text-left"
+                @click="goTimeline(s)"
+              >
+                <UiAvatar :src="s.avatar_url" :name="s.name" size="sm" />
+                <span class="text-[13.5px] font-medium text-ink-800">{{ s.name }}</span>
+                <span v-if="s.nickname" class="text-[12px] text-ink-400">{{ s.nickname }}</span>
+              </button>
+            </li>
+          </ul>
+          <p v-else-if="tlKeyword" class="mt-4 text-center text-[13px] text-ink-400">没有匹配的学员</p>
+          <p v-else class="mt-4 text-center text-[13px] text-ink-400">输入学员姓名即可跳转其成长时间线</p>
+        </div>
+      </UiSheet>
     </section>
 
     <!-- ============ 课程体系（双课程线） ============ -->
@@ -411,30 +496,41 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import {
   ArrowDown,
+  Award,
+  BarChart3,
   Boxes,
   Check,
   Clock,
   FolderOpen,
+  LayoutDashboard,
+  LayoutGrid,
   LogIn,
   MapPin,
   Phone,
   Quote,
   RefreshCw,
+  Settings,
+  ShieldCheck,
   Sparkles,
+  Timer,
+  TrendingUp,
   Trophy,
+  UserPlus,
   Users,
 } from 'lucide-vue-next'
 import UiStat from '@/components/UiStat.vue'
 import UiBadge from '@/components/UiBadge.vue'
 import UiAvatar from '@/components/UiAvatar.vue'
+import UiSheet from '@/components/UiSheet.vue'
 import ResourceIcon from '@/components/ResourceIcon.vue'
 import TrackDot from '@/components/TrackDot.vue'
 import AppWorkbench from '@/components/AppWorkbench.vue'
 import { useAuthStore } from '@/stores/auth'
+import { listStudentOptions } from '@/api/students'
 import { useSiteStore } from '@/stores/site'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { COURSE_STATUS } from '@/lib/dict'
@@ -445,11 +541,111 @@ import { listCoaches } from '@/api/coaches'
 
 const auth = useAuthStore()
 const site = useSiteStore()
+const router = useRouter()
 
 /* 手机端首页 = App 工作台（图标入口）；未登录时仍展示官网首页，保留登录入口。
    桌面端（≥ lg）恒为 false，官网首页原样不动。 */
 const isMobile = useIsMobile()
 const showWorkbench = computed(() => isMobile.value && auth.isLoggedIn)
+
+/* ---------- 首页视图切换：数据看板 / 功能导航（选择记忆在本地） ---------- */
+const VIEW_KEY = 'fc-home-view'
+const viewMode = ref(localStorage.getItem(VIEW_KEY) === 'nav' ? 'nav' : 'dash')
+watch(viewMode, (v) => {
+  try {
+    localStorage.setItem(VIEW_KEY, v)
+  } catch {
+    /* localStorage 不可用时静默降级，不影响功能 */
+  }
+})
+function toggleViewMode() {
+  viewMode.value = viewMode.value === 'dash' ? 'nav' : 'dash'
+}
+
+/* 功能导航分组配置（图标颜色沿用模拟稿的配色体系）。
+   perm 不为空的入口按当前账号权限显隐；action='timeline' 走学员搜索跳转。 */
+const navGroups = [
+  {
+    title: '教学日常',
+    hint: '上课 · 录成绩 · 传资源',
+    color: '#e8564f',
+    items: [
+      { label: '学员档案', icon: Users, to: { name: 'students' }, bg: '#fdedec', fg: '#e8564f' },
+      { label: '课程体系', icon: Boxes, to: { name: 'courses' }, bg: '#e9effd', fg: '#3d6bf5' },
+      { label: '资源中心', icon: FolderOpen, to: { name: 'resources' }, bg: '#eaf3e0', fg: '#7ba32c' },
+      { label: 'CFOP 进度', icon: Timer, to: { name: 'cfop-summary' }, bg: '#fbe9f0', fg: '#d96a96' },
+    ],
+  },
+  {
+    title: '数据洞察',
+    hint: '看趋势 · 看荣誉 · 看成长',
+    color: '#7c6bf5',
+    items: [
+      { label: '统计分析', icon: BarChart3, to: { name: 'analytics' }, perm: 'score.view', bg: '#eeebfd', fg: '#7c6bf5' },
+      { label: 'PB 荣誉墙', icon: Trophy, to: { name: 'honor' }, perm: 'score.view', bg: '#fdf3e1', fg: '#d9a03c' },
+      { label: '成长时间线', icon: TrendingUp, action: 'timeline', bg: '#e4f4f1', fg: '#2e9e90' },
+    ],
+  },
+  {
+    title: '系统管理',
+    hint: '仅管理员可见',
+    color: '#5a6473',
+    items: [
+      { label: '账号管理', icon: UserPlus, to: { name: 'admin-users' }, perm: 'user.manage', bg: '#e4f4f1', fg: '#2e9e90' },
+      { label: '角色权限', icon: ShieldCheck, to: { name: 'admin-roles' }, perm: 'role.manage', bg: '#e7f0fb', fg: '#4a90d9' },
+      { label: '师资团队', icon: Award, to: { name: 'admin-coaches' }, perm: 'coach.manage', bg: '#fbe9f0', fg: '#d96a96' },
+      { label: '站点配置', icon: Settings, to: { name: 'admin-settings' }, perm: 'settings.manage', bg: '#f0efea', fg: '#8a8a80' },
+    ],
+  },
+]
+
+const visibleNavGroups = computed(() =>
+  navGroups
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.perm || auth.can(it.perm)) }))
+    .filter((g) => g.items.length),
+)
+
+function onNavItem(item) {
+  if (item.to) {
+    router.push(item.to)
+  } else if (item.action === 'timeline') {
+    openTimelineSearch()
+  }
+}
+
+/* ---------- 成长时间线：搜索学员跳转 ---------- */
+const showTimelineSearch = ref(false)
+const tlKeyword = ref('')
+const allStudents = ref([])
+const tlResults = computed(() => {
+  const kw = tlKeyword.value.trim().toLowerCase()
+  if (!kw) return []
+  return allStudents.value.filter(
+    (s) =>
+      (s.name || '').toLowerCase().includes(kw) || (s.nickname || '').toLowerCase().includes(kw),
+  )
+})
+
+function openTimelineSearch() {
+  showTimelineSearch.value = true
+  if (!allStudents.value.length) {
+    listStudentOptions()
+      .then((list) => {
+        allStudents.value = list
+      })
+      .catch(() => {
+        allStudents.value = []
+      })
+  }
+}
+function onTlKeyword() {
+  /* 由 tlResults 计算属性实时过滤，这里仅占位保留输入事件钩子 */
+}
+function goTimeline(s) {
+  showTimelineSearch.value = false
+  tlKeyword.value = ''
+  router.push({ name: 'student-timeline', params: { id: s.id } })
+}
 
 const coaches = ref([])
 const stats = ref({})

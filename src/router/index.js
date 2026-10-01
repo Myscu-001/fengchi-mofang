@@ -48,6 +48,18 @@ const routes = [
         meta: { title: 'CFOP 学习', requiresAuth: true, permission: 'student.view' },
       },
       {
+        path: 'students/:id/timeline',
+        name: 'student-timeline',
+        component: () => import('@/views/StudentTimelineView.vue'),
+        meta: { title: '成长时间线', requiresAuth: true, permission: 'student.view' },
+      },
+      {
+        path: 'cfop-summary',
+        name: 'cfop-summary',
+        component: () => import('@/views/CfopSummaryView.vue'),
+        meta: { title: 'CFOP 学习总览', requiresAuth: true, permission: 'student.view' },
+      },
+      {
         path: 'resources',
         name: 'resources',
         component: () => import('@/views/ResourcesView.vue'),
