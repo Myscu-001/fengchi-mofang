@@ -115,6 +115,10 @@ const rows = ref([])
 
 const totalStudents = ref(0)
 const startedCount = computed(() => rows.value.filter((r) => r.total > 0).length)
+/** 按「只看已开启」过滤后的展示列表 */
+const displayRows = computed(() =>
+  onlyStarted.value ? rows.value.filter((r) => r.total > 0) : rows.value,
+)
 const headerDesc = computed(() =>
   onlyStarted.value
     ? '仅显示已开启 CFOP 学习的学员，按最近记录时间倒序'
