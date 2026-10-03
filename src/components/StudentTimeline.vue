@@ -91,7 +91,8 @@
           <div class="tl-stat"><span>入班至今</span><b>{{ summary.monthsFromJoin || '—' }}</b></div>
           <div class="tl-stat"><span>上课次数</span><b>{{ summary.classCount }} 次</b></div>
           <div class="tl-stat"><span>成绩记录</span><b>{{ summary.scoreCount }} 条</b></div>
-          <div class="tl-stat"><span>破 PB</span><b>{{ summary.pbCount }} 次</b></div>
+          <div class="tl-stat"><span>破 PB · 单次</span><b>{{ summary.pbSingleCount }} 次</b></div>
+          <div class="tl-stat"><span>破 PB · 平均</span><b>{{ summary.pbAvgCount }} 次</b></div>
           <div class="tl-stat"><span>段位晋级</span><b>{{ summary.rankCount }} 次</b></div>
           <div v-for="p in summary.progress" :key="p.project" class="tl-stat">
             <span>{{ p.label }}总进步</span>

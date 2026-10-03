@@ -134,7 +134,8 @@ export function buildTimeline(opts = {}) {
   const projMeta = (v) => projects.find((p) => p.value === v) || null
   const projLabel = (v) => projMeta(v)?.label || '该项目'
 
-  let pbCount = 0
+  let pbSingleCount = 0
+  let pbAvgCount = 0
   let rankCount = 0
 
   /* ---------- 1. 成绩：首次记录 / 破 PB / 晋级 / 目标达成 ---------- */
@@ -198,7 +199,7 @@ export function buildTimeline(opts = {}) {
         const prev = bestSingle
         bestSingle = single
         if (prev != null) {
-          pbCount += 1
+          pbSingleCount += 1
           events.push({
             type: 'pb',
             date: day,
@@ -220,7 +221,28 @@ export function buildTimeline(opts = {}) {
 
       if (avg == null) continue
 
+      /* 破 PB（平均）：首次有成绩不算破，要比上一次的纪录更快 */
+      const prevAvg = bestAvg
       if (bestAvg == null || avg < bestAvg) bestAvg = avg
+      if (prevAvg != null && avg < prevAvg) {
+        pbAvgCount += 1
+        events.push({
+          type: 'pb',
+          date: day,
+          project: proj,
+          big: true,
+          milestone: false,
+          title: `破 PB · 平均 ${fmtSec(avg)}`,
+          desc: [
+            { t: '比上次 ' },
+            { t: fmtSec(prevAvg) },
+            { t: ' 快了 ' },
+            { t: `${(prevAvg - avg).toFixed(2)}s`, hl: true },
+            { t: '。' },
+          ],
+          tags: [label, '平均'],
+        })
+      }
       if (firstAvg == null) {
         firstAvg = avg
         firstAvgDay = day
@@ -439,7 +461,9 @@ export function buildTimeline(opts = {}) {
     milestoneCount: events.filter((e) => e.milestone).length,
     classCount: logRows.length,
     scoreCount: scores.filter((r) => dayOf(r?.recorded_at)).length,
-    pbCount,
+    pbCount: pbSingleCount + pbAvgCount,
+    pbSingleCount,
+    pbAvgCount,
     rankCount,
     monthsFromJoin: joined ? humanSpan(diffDays(today, joined)) : '',
     progress,
